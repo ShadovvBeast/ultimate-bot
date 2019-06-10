@@ -28,6 +28,10 @@ module.exports = async (url) => {
       firstInit = false;
 
       await fs.remove('master.zip');
+
+      console.log('New files are applied...');
     });
+  } else {
+    console.log('The software is up to date');
   }
 };
