@@ -19,13 +19,15 @@ module.exports = async (url) => {
     const file = fs.createWriteStream('master.zip');
     res.data.pipe(file);
 
-    file.once('finish', () => {
-      const zip = new AdmZip('./master.zip');
+    file.once('finish', async () => {
+      const zip = new AdmZip('master.zip');
       const zipEntries = zip.getEntries();
       zip.extractEntryTo(zipEntries[0], './', false, true);
 
       lastUpdate = moment();
       firstInit = false;
+
+      await fs.remove('master.zip');
     });
   }
 };
