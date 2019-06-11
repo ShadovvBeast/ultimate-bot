@@ -148,6 +148,7 @@ async function commonIndicator(exchange, closes, last, pair) {
 }
 
 function upTrend(opens, highs, lows, closes) {
+  const lastOpen = _.last(opens);
   const thirdLastClose = closes[closes.length - 3];
 
   const lastCandle = closes[closes.length - 1] - opens[opens.length - 1];
@@ -207,7 +208,8 @@ function upTrend(opens, highs, lows, closes) {
     values: closes,
     stdDev: 2,
   });
-  const thirdLastBB = BBVal[BBVal.length - 2];
+  const lastBB = _.last(BBVal);
+  const thirdLastBB = BBVal[BBVal.length - 3];
   const bbCheck = lastCandle > 0 && secondLastCandle > 0 && thirdLastClose <= thirdLastBB.lower;
 
   const pastBaseCondition = secondLastRSI <= 20 || (secondLastRSI >= 50 && secondLastRSI <= 80);
@@ -221,7 +223,7 @@ function upTrend(opens, highs, lows, closes) {
     return accumulate;
   }, 0);
 
-  const shouldBuy = currentBaseCondition && pastBaseCondition && buyIndicatorAccumulator >= 2;
+  const shouldBuy = currentBaseCondition && pastBaseCondition && lastOpen <= lastBB.upper && buyIndicatorAccumulator >= 2;
   return shouldBuy;
 }
 
