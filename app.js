@@ -308,6 +308,8 @@ const stopLoss = (100 - stopLossPct) / 100;
               resolve(false);
             }
           } catch (error) {
+            waitSell.push({ id, pair });
+            resolve(false);
             console.log(e.message, 'It could be due to internet connection problems, re-checking the order...');
           }
         })));
