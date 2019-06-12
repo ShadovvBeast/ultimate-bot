@@ -2,7 +2,7 @@ const _ = require('lodash');
 const fs = require('fs-extra');
 const moment = require('moment');
 const {
-  BollingerBands, RSI, EMA, OBV, MACD, SMA, HeikinAshi, Stochastic,
+  BollingerBands, RSI, EMA, OBV, MACD, SMA, PSAR, HeikinAshi, Stochastic,
 } = require('technicalindicators');
 
 class AsyncArray extends Array {
@@ -149,6 +149,7 @@ async function commonIndicator(exchange, closes, last, pair) {
 
 function upTrend(opens, highs, lows, closes) {
   const lastOpen = _.last(opens);
+  const lastClose = _.last(closes);
   const thirdLastClose = closes[closes.length - 3];
 
   const lastCandle = closes[closes.length - 1] - opens[opens.length - 1];
@@ -212,6 +213,14 @@ function upTrend(opens, highs, lows, closes) {
   const thirdLastBB = BBVal[BBVal.length - 3];
   const bbCheck = lastCandle > 0 && secondLastCandle > 0 && thirdLastClose <= thirdLastBB.lower;
 
+  const PSARVal = PSAR.calculate({
+    step: 0.0001,
+    max: 0.2,
+    high: highs,
+    low: lows,
+  });
+  const lastPSAR = _.last(PSARVal);
+
   const pastBaseCondition = secondLastRSI <= 20 || (secondLastRSI >= 50 && secondLastRSI <= 80);
   const currentBaseCondition = lastRSI <= 20 || (lastRSI >= 50 && lastRSI <= 80);
 
@@ -223,7 +232,7 @@ function upTrend(opens, highs, lows, closes) {
     return accumulate;
   }, 0);
 
-  const shouldBuy = currentBaseCondition && pastBaseCondition && lastOpen <= lastBB.upper && buyIndicatorAccumulator >= 2;
+  const shouldBuy = currentBaseCondition && pastBaseCondition && lastOpen <= lastBB.upper && lastPSAR <= lastClose && buyIndicatorAccumulator >= 2;
   return shouldBuy;
 }
 
