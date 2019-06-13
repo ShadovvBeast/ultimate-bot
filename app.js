@@ -90,7 +90,7 @@ const stopLoss = (100 - stopLossPct) / 100;
 
             if (checkAmount) {
               const sellRef = await exchange.createLimitSellOrder(symbol, amount2Sell.toFixedNumber(precision.amount).noExponents(), rate2Sell.toFixedNumber(precision.price).noExponents());
-              await writeBought(dangling, bought, pair, id, sellRef.id);
+              await writeBought(dangling, bought, pair, id, sellRef.id, price);
               console.log('Unresolved order, selling dangling order');
               messageTrade(sellRef, 'Sell', amount2Sell, symbol, rate2Sell, telegram, telegramUserId);
             }
@@ -262,7 +262,7 @@ const stopLoss = (100 - stopLossPct) / 100;
         if (checkAmount) {
           const sellRef = await exchange.createLimitSellOrder(pair, amount2Sell.toFixedNumber(amount).noExponents(), rate2Sell.toFixedNumber(price).noExponents());
           messageTrade(sellRef, 'Sell', amount2Sell, pair, rate2Sell, telegram, telegramUserId);
-          await writeBought(dangling, bought, pair, buyRef.id, sellRef.id);
+          await writeBought(dangling, bought, pair, buyRef.id, sellRef.id, rate2Buy);
         }
       } else {
         throw new Error('At check bought or not');
@@ -283,7 +283,7 @@ const stopLoss = (100 - stopLossPct) / 100;
         const markets = await exchange.fetchMarkets();
         const waitSell = [];
         const boughtAsync = new AsyncArray(bought);
-        const shouldStopLoss = await boughtAsync.filterAsync(({ id, pair }) => limiter.schedule(() => new Promise(async (resolve) => {
+        const shouldStopLoss = await boughtAsync.filterAsync(({ id, pair, boughtRate }) => limiter.schedule(() => new Promise(async (resolve) => {
           try {
             const { last } = await exchange.fetchTicker(pair);
             const {
@@ -293,10 +293,12 @@ const stopLoss = (100 - stopLossPct) / 100;
             const currentTime = moment();
             const targetTime = moment(datetime);
             const diffTime = moment.duration(currentTime.diff(targetTime)).asHours();
-            const stopLossPrice = price * stopLoss;
+            const stopLossPrice = boughtRate * stopLoss;
 
             if (status === 'closed') {
-              telegram.sendMessage(telegramUserId, `Sold ${filled} ${pair} at rate = ${price}`);
+              const mess = `[${moment().format('HH:mm:ss DD/MM/YYYY')}] - Sold ${filled} ${pair} at rate = ${price}`;
+              console.log(mess);
+              telegram.sendMessage(telegramUserId, mess);
               resolve(false);
             } else if ((diffTime >= 24 && status === 'open') || (last <= stopLossPrice && diffTime >= 3 && status === 'open')) {
               const cancel = await exchange.cancelOrder(id, pair);

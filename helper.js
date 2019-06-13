@@ -42,11 +42,11 @@ async function writeDangling(dangling, bought, pair, id) {
   await fs.writeJSON('./trade.json', { dangling, bought });
 }
 
-async function writeBought(dangling, bought, pair, buyId, sellId = null) {
+async function writeBought(dangling, bought, pair, buyId, sellId = null, boughtRate = 0) {
   const filterDangling = dangling.filter(o => o.id !== buyId);
   if (sellId !== null) {
     bought.push({
-      id: sellId, pair,
+      id: sellId, pair, boughtRate,
     });
   }
   await fs.writeJSON('./trade.json', { dangling: filterDangling, bought });
@@ -70,8 +70,10 @@ async function checkBuy(exchange, timeOrder, id, pair, telegram, telegramUserId)
         } else if (diffTime >= timeOrder && status === 'open') {
           await exchange.cancelOrder(id, pair);
 
-          console.log(`Cancel the order: ${pair} due to exceed ${timeOrder} mins`);
-          telegram.sendMessage(telegramUserId, `Cancel the order: ${pair} due to exceed ${timeOrder} mins`);
+          const mess = `[${moment().format('HH:mm:ss DD/MM/YYYY')}] - Cancel the order: ${pair} due to exceed ${timeOrder} mins`;
+
+          console.log(mess);
+          telegram.sendMessage(telegramUserId, mess);
 
           resolve(filled);
           clearInterval(checkBuyInterval);
@@ -84,7 +86,7 @@ async function checkBuy(exchange, timeOrder, id, pair, telegram, telegramUserId)
 
   if (buyFilled > 0) {
     const { price } = buyRef;
-    telegram.sendMessage(telegramUserId, `Bought ${buyFilled} ${pair} at rate = ${price}`);
+    telegram.sendMessage(telegramUserId, `[${moment().format('HH:mm:ss DD/MM/YYYY')}] - Bought ${buyFilled} ${pair} at rate = ${price}`);
   }
 
   return buyFilled;
