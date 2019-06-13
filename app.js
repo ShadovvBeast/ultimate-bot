@@ -293,12 +293,12 @@ const stopLoss = (100 - stopLossPct) / 100;
             const currentTime = moment();
             const targetTime = moment(datetime);
             const diffTime = moment.duration(currentTime.diff(targetTime)).asHours();
-            const diffPrice = last / price;
+            const stopLossPrice = price * stopLoss;
 
             if (status === 'closed') {
               telegram.sendMessage(telegramUserId, `Sold ${filled} ${pair} at rate = ${price}`);
               resolve(false);
-            } else if ((diffTime >= 24 && status === 'open') || (diffPrice <= stopLoss && diffTime >= 3 && status === 'open')) {
+            } else if ((diffTime >= 24 && status === 'open') || (last <= stopLossPrice && diffTime >= 3 && status === 'open')) {
               const cancel = await exchange.cancelOrder(id, pair);
               console.log('Cancel sell order due to exceed time');
               console.log(cancel);
