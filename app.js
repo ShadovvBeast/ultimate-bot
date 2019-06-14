@@ -90,7 +90,7 @@ const stopLoss = (100 - stopLossPct) / 100;
 
             if (checkAmount) {
               const sellRef = await exchange.createLimitSellOrder(symbol, amount2Sell.toFixedNumber(precision.amount).noExponents(), rate2Sell.toFixedNumber(precision.price).noExponents());
-              await writeBought(dangling, bought, pair, id, sellRef.id, price);
+              await writeBought(dangling, bought, pair, id, sellRef.id);
               console.log('Unresolved order, selling dangling order');
               messageTrade(sellRef, 'Sell', amount2Sell, symbol, rate2Sell, telegram, telegramUserId);
             }
@@ -262,7 +262,7 @@ const stopLoss = (100 - stopLossPct) / 100;
         if (checkAmount) {
           const sellRef = await exchange.createLimitSellOrder(pair, amount2Sell.toFixedNumber(amount).noExponents(), rate2Sell.toFixedNumber(price).noExponents());
           messageTrade(sellRef, 'Sell', amount2Sell, pair, rate2Sell, telegram, telegramUserId);
-          await writeBought(dangling, bought, pair, buyRef.id, sellRef.id, rate2Buy);
+          await writeBought(dangling, bought, pair, buyRef.id, sellRef.id);
         }
       } else {
         throw new Error('At check bought or not');
@@ -283,7 +283,7 @@ const stopLoss = (100 - stopLossPct) / 100;
         const markets = await exchange.fetchMarkets();
         const waitSell = [];
         const boughtAsync = new AsyncArray(bought);
-        const shouldStopLoss = await boughtAsync.filterAsync(({ id, pair, boughtRate }) => limiter.schedule(() => new Promise(async (resolve) => {
+        const shouldStopLoss = await boughtAsync.filterAsync(({ id, pair }) => limiter.schedule(() => new Promise(async (resolve) => {
           try {
             const { last } = await exchange.fetchTicker(pair);
             const {
@@ -293,6 +293,7 @@ const stopLoss = (100 - stopLossPct) / 100;
             const currentTime = moment();
             const targetTime = moment(datetime);
             const diffTime = moment.duration(currentTime.diff(targetTime)).asHours();
+            const boughtRate = price / takeProfit;
             const stopLossPrice = boughtRate * stopLoss;
 
             if (status === 'closed') {
@@ -306,17 +307,17 @@ const stopLoss = (100 - stopLossPct) / 100;
               console.log(cancel);
               resolve(true);
             } else {
-              waitSell.push({ id, pair, boughtRate });
+              waitSell.push({ id, pair });
               resolve(false);
             }
           } catch (error) {
-            waitSell.push({ id, pair, boughtRate });
+            waitSell.push({ id, pair });
             resolve(false);
             console.log(e.message, 'It could be due to internet connection problems, re-checking the order...');
           }
         })));
 
-        const tempBought = shouldStopLoss.length > 0 ? await Promise.all(shouldStopLoss.map(({ id, pair, boughtRate }) => limiter.schedule(() => new Promise(async (resolve, reject) => {
+        const tempBought = shouldStopLoss.length > 0 ? await Promise.all(shouldStopLoss.map(({ id, pair }) => limiter.schedule(() => new Promise(async (resolve, reject) => {
           try {
             const { precision } = _.find(markets, o => o.symbol === pair);
             const { amount, filled } = await exchange.fetchOrder(id, pair);
@@ -329,7 +330,7 @@ const stopLoss = (100 - stopLossPct) / 100;
               const stopLossRef = await exchange.createLimitSellOrder(pair, remain.toFixedNumber(precision.amount).noExponents(), rate2StopLoss.toFixedNumber(precision.price).noExponents());
 
               messageTrade(stopLossRef, 'Stop Loss', remain, pair, rate2StopLoss, telegram, telegramUserId);
-              resolve({ id: stopLossRef.id, pair, boughtRate });
+              resolve({ id: stopLossRef.id, pair });
             } else {
               resolve(null);
             }

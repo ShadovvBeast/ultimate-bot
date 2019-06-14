@@ -42,11 +42,11 @@ async function writeDangling(dangling, bought, pair, id) {
   await fs.writeJSON('./trade.json', { dangling, bought });
 }
 
-async function writeBought(dangling, bought, pair, buyId, sellId = null, boughtRate = 0) {
+async function writeBought(dangling, bought, pair, buyId, sellId = null) {
   const filterDangling = dangling.filter(o => o.id !== buyId);
   if (sellId !== null) {
     bought.push({
-      id: sellId, pair, boughtRate,
+      id: sellId, pair,
     });
   }
   await fs.writeJSON('./trade.json', { dangling: filterDangling, bought });
