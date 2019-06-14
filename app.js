@@ -306,17 +306,17 @@ const stopLoss = (100 - stopLossPct) / 100;
               console.log(cancel);
               resolve(true);
             } else {
-              waitSell.push({ id, pair });
+              waitSell.push({ id, pair, boughtRate });
               resolve(false);
             }
           } catch (error) {
-            waitSell.push({ id, pair });
+            waitSell.push({ id, pair, boughtRate });
             resolve(false);
             console.log(e.message, 'It could be due to internet connection problems, re-checking the order...');
           }
         })));
 
-        const tempBought = shouldStopLoss.length > 0 ? await Promise.all(shouldStopLoss.map(({ id, pair }) => limiter.schedule(() => new Promise(async (resolve, reject) => {
+        const tempBought = shouldStopLoss.length > 0 ? await Promise.all(shouldStopLoss.map(({ id, pair, boughtRate }) => limiter.schedule(() => new Promise(async (resolve, reject) => {
           try {
             const { precision } = _.find(markets, o => o.symbol === pair);
             const { amount, filled } = await exchange.fetchOrder(id, pair);
@@ -329,7 +329,7 @@ const stopLoss = (100 - stopLossPct) / 100;
               const stopLossRef = await exchange.createLimitSellOrder(pair, remain.toFixedNumber(precision.amount).noExponents(), rate2StopLoss.toFixedNumber(precision.price).noExponents());
 
               messageTrade(stopLossRef, 'Stop Loss', remain, pair, rate2StopLoss, telegram, telegramUserId);
-              resolve({ id: stopLossRef.id, pair });
+              resolve({ id: stopLossRef.id, pair, boughtRate });
             } else {
               resolve(null);
             }
