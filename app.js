@@ -83,21 +83,19 @@ const stopLoss = (100 - stopLossPct) / 100;
             await exchange.cancelOrder(id, pair);
           }
 
-          if (filled > 0) {
-            const rate2Sell = price * takeProfit;
-            const amount2Sell = await calculateAmount2Sell(exchange, pair, filled);
-            const checkAmount = isAmountOk(marketPlace, amount2Sell, rate2Sell);
+          const rate2Sell = price * takeProfit;
+          const amount2Sell = await calculateAmount2Sell(exchange, pair, filled);
+          const checkAmount = isAmountOk(marketPlace, amount2Sell, rate2Sell);
 
-            if (checkAmount) {
-              const sellRef = await exchange.createLimitSellOrder(symbol, amount2Sell.toFixedNumber(precision.amount).noExponents(), rate2Sell.toFixedNumber(precision.price).noExponents());
-              await writeBought(dangling, bought, pair, id, sellRef.id);
-              console.log('Unresolved order, selling dangling order');
-              messageTrade(sellRef, 'Sell', amount2Sell, symbol, rate2Sell, telegram, telegramUserId);
-            }
+          if (filled > 0 && checkAmount) {
+            const sellRef = await exchange.createLimitSellOrder(symbol, amount2Sell.toFixedNumber(precision.amount).noExponents(), rate2Sell.toFixedNumber(precision.price).noExponents());
+            await writeBought(dangling, bought, pair, id, sellRef.id);
+            console.log('Unresolved order, selling dangling order');
+            messageTrade(sellRef, 'Sell', amount2Sell, symbol, rate2Sell, telegram, telegramUserId);
           } else {
             await writeBought(dangling, bought, pair, id);
+            resolve();
           }
-          resolve();
         } catch (e) {
           await writeBought(dangling, bought, pair, id);
         }
