@@ -35,7 +35,7 @@ let delay = 0;
 const baseDelay = 1000;
 
 const {
-  AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, calculateAmount2Sell, commonIndicator, upTrend, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
+  loggingMessage, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, calculateAmount2Sell, commonIndicator, upTrend, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
 } = require('./helper');
 
 const {
@@ -85,7 +85,7 @@ const stopLoss = (100 - stopLossPct) / 100;
 
           const rate2Sell = price * takeProfit;
           const amount2Sell = await calculateAmount2Sell(exchange, pair, filled);
-          const checkAmount = isAmountOk(marketPlace, amount2Sell, rate2Sell);
+          const checkAmount = isAmountOk(pair, amount2Sell, rate2Sell, telegram, telegramUserId);
 
           if (filled > 0 && checkAmount) {
             const sellRef = await exchange.createLimitSellOrder(symbol, amount2Sell.toFixedNumber(precision.amount).noExponents(), rate2Sell.toFixedNumber(precision.price).noExponents());
@@ -131,7 +131,6 @@ const stopLoss = (100 - stopLossPct) / 100;
       }
     }
 
-    const openOrders = await exchange.fetchOpenOrders();
     let scanMarkets = [];
 
     if (useStableMarket && stableCoinBalance >= 11 && marketPlaceBalance >= 0.001) {
@@ -147,6 +146,13 @@ const stopLoss = (100 - stopLossPct) / 100;
       throw new Error('At check pairs to scan step');
     }
 
+    const openOrders = await exchange.fetchOpenOrders();
+
+    if (openOrders.length >= 3) {
+      console.log('Waiting for other open orders are filled');
+      throw new Error('At check open orders step');
+    }
+
     const candleMarkets = await Promise.all(scanMarkets.map(({ symbol }) => limiter.schedule(() => new Promise(async (resolve, reject) => {
       try {
         const boughtIndex = openOrders.findIndex(o => o.symbol === symbol);
@@ -154,7 +160,7 @@ const stopLoss = (100 - stopLossPct) / 100;
           const candles = await fetchCandle(exchange, symbol, timeFrame);
           const ticker = await exchange.fetchTicker(symbol);
 
-          console.log(`[${moment().format('HH:mm:ss DD/MM/YYYY')}] - Scanning: ${symbol}`);
+          console.log(loggingMessage(`Scanning: ${symbol}`));
 
           resolve({
             pair: symbol, ...candles, ...ticker,
@@ -191,7 +197,7 @@ const stopLoss = (100 - stopLossPct) / 100;
         const volChecker = volDiff >= 0.75 || volOscRSI > 0;
 
         const baseCondition = last >= 0.000001 && last <= lastEMA && spikyVal <= 3.5 && changeBB >= 1.08 && quoteVolume >= 1 && orderThickness >= 0.95 && volChecker;
-        const strategyResult = `[${moment().format('HH:mm:ss DD/MM/YYYY')}] - Calculating Strategy: ${pair} - Result:`;
+        const strategyResult = loggingMessage(`Calculating Strategy: ${pair} - Result:`);
 
         if (last <= baseRate && lastRSI <= 35 && baseCondition) {
           console.log(strategyResult, 'SUCCESS');
@@ -254,8 +260,8 @@ const stopLoss = (100 - stopLossPct) / 100;
       if (buyFilled > 0) {
         const amount2Sell = await calculateAmount2Sell(exchange, pair, buyFilled);
         const rate2Sell = rate2Buy * takeProfit;
+        const checkAmount = isAmountOk(pair, amount2Sell, rate2Sell, telegram, telegramUserId);
 
-        const checkAmount = isAmountOk(marketPlace, amount2Sell, rate2Sell);
         if (checkAmount) {
           const sellRef = await exchange.createLimitSellOrder(pair, amount2Sell.toFixedNumber(amount).noExponents(), rate2Sell.toFixedNumber(price).noExponents());
           messageTrade(sellRef, 'Sell', amount2Sell, pair, rate2Sell, telegram, telegramUserId);
@@ -321,7 +327,7 @@ const stopLoss = (100 - stopLossPct) / 100;
             const { bid } = await exchange.fetchTicker(pair);
             const rate2StopLoss = bid * 0.99;
             const remain = await calculateAmount2Sell(exchange, pair, amount - filled);
-            const checkAmount = isAmountOk(marketPlace, remain, rate2StopLoss);
+            const checkAmount = isAmountOk(pair, remain, rate2StopLoss, telegram, telegramUserId);
 
             if (checkAmount) {
               const stopLossRef = await exchange.createLimitSellOrder(pair, remain.toFixedNumber(precision.amount).noExponents(), rate2StopLoss.toFixedNumber(precision.price).noExponents());
@@ -329,7 +335,7 @@ const stopLoss = (100 - stopLossPct) / 100;
               messageTrade(stopLossRef, 'Stop Loss', remain, pair, rate2StopLoss, telegram, telegramUserId);
               resolve({ id: stopLossRef.id, pair });
             } else {
-              resolve(null);
+              resolve({ id, pair });
             }
           } catch (error) {
             reject(error);

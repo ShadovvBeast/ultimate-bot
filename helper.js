@@ -5,6 +5,10 @@ const {
   BollingerBands, RSI, EMA, OBV, MACD, SMA, PSAR, HeikinAshi, Stochastic,
 } = require('technicalindicators');
 
+function loggingMessage(msg) {
+  return `[${moment().format('HH:mm:ss DD/MM/YYYY')}] - ${msg}`;
+}
+
 class AsyncArray extends Array {
   constructor(arr) {
     super();
@@ -70,7 +74,7 @@ async function checkBuy(exchange, timeOrder, id, pair, telegram, telegramUserId)
         } else if (diffTime >= timeOrder && status === 'open') {
           await exchange.cancelOrder(id, pair);
 
-          const mess = `[${moment().format('HH:mm:ss DD/MM/YYYY')}] - Cancel the order: ${pair} due to exceed ${timeOrder} mins`;
+          const mess = loggingMessage(`Cancel the order: ${pair} due to exceed ${timeOrder} mins`);
 
           console.log(mess);
           telegram.sendMessage(telegramUserId, mess);
@@ -86,7 +90,7 @@ async function checkBuy(exchange, timeOrder, id, pair, telegram, telegramUserId)
 
   if (buyFilled > 0) {
     const { price } = buyRef;
-    telegram.sendMessage(telegramUserId, `[${moment().format('HH:mm:ss DD/MM/YYYY')}] - Bought ${buyFilled} ${pair} at rate = ${price}`);
+    telegram.sendMessage(telegramUserId, loggingMessage(`Bought ${buyFilled} ${pair} at rate = ${price}`));
   }
 
   return buyFilled;
@@ -107,7 +111,7 @@ function restart(start, e) {
 }
 
 function messageTrade(ref, side, amount, pair, rate, telegram, telegramUserId) {
-  const mess = `[${moment().format('HH:mm:ss DD/MM/YYYY')}] - ${side}: ${amount} ${pair} at rate = ${rate}`;
+  const mess = loggingMessage(`${side}: ${amount} ${pair} at rate = ${rate}`);
   console.log(mess);
   console.log(ref);
   telegram.sendMessage(telegramUserId, mess);
@@ -254,15 +258,26 @@ async function calculateAmount2Sell(exchange, pair, orgAmount) {
   return enhancedAmount;
 }
 
-function isAmountOk(marketPlace, amount, rate) {
+function isAmountOk(pair, amount, rate, telegram, telegramUserId) {
+  let checkAmount = true;
+  const re = /\w+$/;
+  const [marketPlace] = pair.match(re);
+
   if (marketPlace === 'BTC') {
-    return (amount * rate) > 0.0011;
+    checkAmount = (amount * rate) >= 0.001;
   } if (marketPlace === 'ETH') {
-    return (amount * rate) > 0.011;
+    checkAmount = (amount * rate) >= 0.01;
   } if (marketPlace === 'BNB') {
-    return (amount * rate) > 2;
+    checkAmount = (amount * rate) >= 1;
   }
-  return (amount * rate) > 11;
+  checkAmount = (amount * rate) >= 1;
+
+  if (!checkAmount) {
+    const mess = loggingMessage(`The order ${pair} is invalid due to too small, please consider to manually buy/sell it`);
+    telegram.sendMessage(telegramUserId, mess);
+  }
+
+  return checkAmount;
 }
 
 function smoothedCandle(opens, highs, lows, closes, period) {
@@ -427,5 +442,5 @@ function obvOscillatorRSI(closes, vols, period = 7) {
 }
 
 module.exports = {
-  AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, commonIndicator, upTrend, calculateAmount2Sell, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
+  loggingMessage, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, commonIndicator, upTrend, calculateAmount2Sell, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
 };
