@@ -335,7 +335,7 @@ const stopLoss = (100 - stopLossPct) / 100;
               messageTrade(stopLossRef, 'Stop Loss', remain, pair, rate2StopLoss, telegram, telegramUserId);
               resolve({ id: stopLossRef.id, pair });
             } else {
-              resolve({ id, pair });
+              resolve(null);
             }
           } catch (error) {
             reject(error);
