@@ -269,8 +269,9 @@ function isAmountOk(pair, amount, rate, telegram, telegramUserId) {
     checkAmount = (amount * rate) >= 0.01;
   } if (marketPlace === 'BNB') {
     checkAmount = (amount * rate) >= 1;
+  } else {
+    checkAmount = (amount * rate) >= 1;
   }
-  checkAmount = (amount * rate) >= 1;
 
   if (!checkAmount) {
     const mess = loggingMessage(`The order ${pair} is invalid due to too small, please consider to manually buy/sell it`);
