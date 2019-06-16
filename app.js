@@ -149,11 +149,10 @@ const stopLoss = (100 - stopLossPct) / 100;
 
     const candleMarkets = await Promise.all(scanMarkets.map(({ symbol }) => limiter.schedule(() => new Promise(async (resolve, reject) => {
       try {
-        const ticker = await exchange.fetchTicker(symbol);
         const boughtIndex = openOrders.findIndex(o => o.symbol === symbol);
-
         if (boughtIndex === -1) {
           const candles = await fetchCandle(exchange, symbol, timeFrame);
+          const ticker = await exchange.fetchTicker(symbol);
 
           console.log(`[${moment().format('HH:mm:ss DD/MM/YYYY')}] - Scanning: ${symbol}`);
 
