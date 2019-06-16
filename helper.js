@@ -265,12 +265,12 @@ function isAmountOk(pair, amount, rate, telegram, telegramUserId) {
 
   if (marketPlace === 'BTC') {
     checkAmount = (amount * rate) >= 0.001;
-  } if (marketPlace === 'ETH') {
+  } else if (marketPlace === 'ETH') {
     checkAmount = (amount * rate) >= 0.01;
-  } if (marketPlace === 'BNB') {
+  } else if (marketPlace === 'BNB') {
     checkAmount = (amount * rate) >= 1;
   } else {
-    checkAmount = (amount * rate) >= 1;
+    checkAmount = (amount * rate) >= 10;
   }
 
   if (!checkAmount) {
