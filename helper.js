@@ -273,7 +273,7 @@ function isAmountOk(pair, amount, rate, telegram, telegramUserId) {
     checkAmount = (amount * rate) >= 10;
   }
 
-  if (!checkAmount) {
+  if (!checkAmount && amount !== 0) {
     const mess = loggingMessage(`The order ${pair} is invalid due to too small, please consider to manually buy/sell it`);
     telegram.sendMessage(telegramUserId, mess);
   }
