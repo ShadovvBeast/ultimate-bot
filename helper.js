@@ -118,6 +118,8 @@ function messageTrade(ref, side, amount, pair, rate, telegram, telegramUserId) {
 }
 
 async function commonIndicator(exchange, closes, last, pair) {
+  const closeDiff = _.last(closes) / closes[closes.length - 2];
+
   const BBVal = BollingerBands.calculate({
     period: 20,
     values: closes,
@@ -149,7 +151,7 @@ async function commonIndicator(exchange, closes, last, pair) {
   const orderThickness = bids[limitBidOrderBook - 1][0] / bids[0][0];
 
   return {
-    baseRate, lastRSI, lastEMA, spikyVal, changeBB, orderThickness, bidVol, askVol,
+    baseRate, lastRSI, lastEMA, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff,
   };
 }
 

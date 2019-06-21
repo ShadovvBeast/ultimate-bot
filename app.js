@@ -184,7 +184,7 @@ const stopLoss = (100 - stopLossPct) / 100;
     }) => limiter.schedule(() => new Promise(async (resolve, reject) => {
       try {
         const {
-          baseRate, lastRSI, lastEMA, spikyVal, changeBB, orderThickness, bidVol, askVol,
+          baseRate, lastRSI, lastEMA, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff,
         } = await commonIndicator(exchange, closes, last, pair);
         const shouldBuyUpTrend = upTrend(opens, highs, lows, closes);
         const shouldBuySmmothedHeikin = smoothedHeikin(opens, highs, lows, closes, 14);
@@ -196,7 +196,7 @@ const stopLoss = (100 - stopLossPct) / 100;
         const volDiff = bidVol / askVol;
         const volChecker = volDiff >= 0.75 || volOscRSI > 0;
 
-        const baseCondition = last >= 0.000001 && last <= lastEMA && spikyVal <= 3.5 && changeBB >= 1.08 && quoteVolume >= 1 && orderThickness >= 0.95 && volChecker;
+        const baseCondition = last >= 0.000001 && last <= lastEMA && spikyVal <= 3.5 && changeBB >= 1.08 && quoteVolume >= 1 && orderThickness >= 0.95 && volChecker && closeDiff <= 1.025;
         const strategyResult = loggingMessage(`Calculating Strategy: ${pair} - Result:`);
 
         if (last <= baseRate && lastRSI <= 35 && baseCondition) {
