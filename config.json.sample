@@ -3,7 +3,7 @@
   "secret": "",
   "telegramUserId": 00000000,
   "marketPlace": "BTC",
-  "useFundPercentage": 100,
+  "useFundPercentage": 20,
   "takeProfitPct": 1.5,
   "stopLossPct": 5,
   "useStableMarket": true,
