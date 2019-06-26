@@ -5,7 +5,7 @@
   "marketPlace": "BTC",
   "useFundPercentage": 20,
   "takeProfitPct": 1.5,
-  "stopLossPct": 5,
+  "stopLossPct": 1.5,
   "useStableMarket": true,
   "stableMarket": "USDT",
   "timeOrder": 45,
