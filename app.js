@@ -110,8 +110,6 @@ const stopLoss = (100 - stopLossPct) / 100;
     if (marketPlaceBalance < 0.001 && stableCoinBalance < 11) {
       console.log(`You have too small ${marketPlace}, plzz deposit more or cancel open order`);
       throw new Error('At check balance step');
-    } else if (stableCoinBalance >= 11) {
-      console.log(`The bot moved your fund to ${stableMarket}, it is waiting for the right opportunity to buy ${marketPlace} back`);
     }
 
     if (useStableMarket) {
@@ -131,6 +129,16 @@ const stopLoss = (100 - stopLossPct) / 100;
       }
     }
 
+    const marketPlaceInfo = await exchange.fetchTicker(`${marketPlace}/${stableMarket}`);
+    if (marketPlaceInfo.percentage >= 5 || marketPlaceInfo.percentage <= -7) {
+      if (marketPlaceInfo.percentage >= 5) {
+        console.log(`The ${marketPlace} is going up too much, so it's better to pause for a while`);
+      } else {
+        console.log(`The ${marketPlace} is going down too much, so it's better to pause for a while`);
+      }
+      throw new Error('At check is stable market step');
+    }
+
     let scanMarkets = [];
 
     if (useStableMarket && stableCoinBalance >= 11 && marketPlaceBalance >= 0.001) {
@@ -148,7 +156,7 @@ const stopLoss = (100 - stopLossPct) / 100;
 
     const openOrders = await exchange.fetchOpenOrders();
 
-    if (openOrders.length >= 3) {
+    if (openOrders.length >= 2) {
       console.log('Waiting for other open orders are filled');
       throw new Error('At check open orders step');
     }
