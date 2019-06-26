@@ -32,7 +32,7 @@ const ccxt = require('ccxt');
 const Bottleneck = require('bottleneck');
 const cluster = require('cluster');
 
-const delay = 0;
+let delay = 0;
 const baseDelay = 1000;
 
 const {
@@ -54,7 +54,7 @@ if (cluster.isMaster) {
   cluster.fork();
 
   cluster.on('exit', () => {
-    console.log('Resetting...');
+    console.log('New files are applied. Resetting...');
     setTimeout(() => {
       cluster.fork();
     }, 60000);

@@ -24,8 +24,6 @@ module.exports = async (url) => {
 
         await fs.remove('master.zip');
 
-        console.log('New files are applied...');
-
         process.exit(0);
         return false;
       });
