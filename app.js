@@ -55,7 +55,9 @@ if (cluster.isMaster) {
 
   cluster.on('exit', () => {
     console.log('Resetting...');
-    cluster.fork();
+    setTimeout(() => {
+      cluster.fork();
+    }, 60000);
   });
 } else {
   const telegram = new TelegramBot('746223720:AAFOzf75YuDp1N5xcHLV7EKozB7C0huuw2Y');

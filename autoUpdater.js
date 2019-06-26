@@ -7,11 +7,6 @@ module.exports = async (url) => {
     const { version } = await fs.readJSON('./package.json');
     const fetchRemotePackage = await axios.get('https://raw.githubusercontent.com/dotai2012/ultimate-bot/master/package.json');
     const remoteVersion = fetchRemotePackage.data.version;
-    console.log(`This is pid ${process.pid}`);
-
-    if (process.env.restart) {
-      delete process.env.restart;
-    }
 
     if (version !== remoteVersion) {
       const { data } = await axios({
@@ -30,8 +25,8 @@ module.exports = async (url) => {
         await fs.remove('master.zip');
 
         console.log('New files are applied...');
-        process.exit(0);
 
+        process.exit(0);
         return false;
       });
     } else {
