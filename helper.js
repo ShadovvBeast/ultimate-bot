@@ -103,7 +103,7 @@ function restart(start, e) {
     }, 5000);
   } else {
     console.log(e.message);
-    console.log('Resetting');
+    console.log('Resetting...');
     setTimeout(() => {
       start.call(this);
     }, 60000);
