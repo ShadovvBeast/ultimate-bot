@@ -1,6 +1,6 @@
 {
   "name": "ultimate-bot",
-  "version": "3.1.4",
+  "version": "3.1.5",
   "main": "app.js",
   "license": "MIT",
   "dependencies": {
@@ -8,7 +8,7 @@
     "auto-updater": "^1.0.2",
     "axios": "^0.19.0",
     "bottleneck": "^2.19.1",
-    "ccxt": "^1.18.829",
+    "ccxt": "^1.18.832",
     "fs-extra": "^8.0.1",
     "lodash": "^4.17.11",
     "moment": "^2.24.0",
