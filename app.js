@@ -203,8 +203,8 @@ if (cluster.isMaster) {
       }) => limiter.schedule(() => new Promise(async (resolve, reject) => {
         try {
           const {
-            baseRate, lastRSI, lastEMA, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff,
-          } = await commonIndicator(exchange, closes, last, pair);
+            baseRate, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff,
+          } = await commonIndicator(exchange, highs, lows, closes, last, pair);
           const shouldBuyUpTrend = upTrend(opens, highs, lows, closes);
           const shouldBuySmmothedHeikin = smoothedHeikin(opens, highs, lows, closes, 14);
           const { shouldBuySlowHeikin } = slowHeikin(opens, highs, lows, closes, 6, 0.666, 0.0645);
@@ -215,6 +215,8 @@ if (cluster.isMaster) {
           const volDiff = bidVol / askVol;
           const volChecker = volDiff >= 0.75 || volOscRSI > 0;
 
+          const lastClose = _.last(closes);
+
           const baseCondition = last >= 0.000001 && last <= lastEMA && spikyVal <= 3.5 && changeBB >= 1.08 && quoteVolume >= 1 && orderThickness >= 0.95 && volChecker && closeDiff <= 1.025;
           const strategyResult = loggingMessage(`Calculating Strategy: ${pair} - Result:`);
 
@@ -223,12 +225,12 @@ if (cluster.isMaster) {
             resolve({
               pair, percentage, bid, baseRate, method: 'Dip',
             });
-          } else if (shouldBuySmmothedHeikin && baseCondition) {
+          } else if (shouldBuySmmothedHeikin && lastPSAR <= lastClose && baseCondition) {
             console.log(strategyResult, 'SUCCESS');
             resolve({
               pair, percentage, bid, baseRate, method: 'Smoothed Heikin',
             });
-          } else if (shouldBuySlowHeikin && baseCondition) {
+          } else if (shouldBuySlowHeikin && lastPSAR <= lastClose && baseCondition) {
             console.log(strategyResult, 'SUCCESS');
             resolve({
               pair, percentage, bid, baseRate, method: 'Slow Heikin',

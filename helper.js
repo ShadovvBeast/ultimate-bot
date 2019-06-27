@@ -117,7 +117,7 @@ function messageTrade(ref, side, amount, pair, rate, telegram, telegramUserId) {
   telegram.sendMessage(telegramUserId, mess);
 }
 
-async function commonIndicator(exchange, closes, last, pair) {
+async function commonIndicator(exchange, highs, lows, closes, last, pair) {
   const closeDiff = _.last(closes) / closes[closes.length - 2];
 
   const BBVal = BollingerBands.calculate({
@@ -130,6 +130,14 @@ async function commonIndicator(exchange, closes, last, pair) {
 
   const RSIVal = RSI.calculate({ period: 14, values: closes });
 
+  const PSARVal = PSAR.calculate({
+    step: 0.0001,
+    max: 0.2,
+    high: highs,
+    low: lows,
+  });
+
+  const lastPSAR = _.last(PSARVal);
   const lastBB = _.last(BBVal);
   const lastRSI = _.last(RSIVal);
   const lastEMA = _.last(EMAVal);
@@ -151,7 +159,7 @@ async function commonIndicator(exchange, closes, last, pair) {
   const orderThickness = bids[limitBidOrderBook - 1][0] / bids[0][0];
 
   return {
-    baseRate, lastRSI, lastEMA, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff,
+    baseRate, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff,
   };
 }
 
