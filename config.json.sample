@@ -1,7 +1,7 @@
 {
   "apiKey": "",
   "secret": "",
-  "telegramUserId": 00000000,
+  "telegramUserId": 123456789,
   "marketPlace": "BTC",
   "useFundPercentage": 15,
   "takeProfitPct": 1.5,
