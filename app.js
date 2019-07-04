@@ -33,6 +33,9 @@ const Bottleneck = require('bottleneck');
 const cluster = require('cluster');
 
 let delay = 0;
+let lastScannedSymbol;
+let shouldSkipAllSymbols = false;
+let shouldEnableCounterDDOS = false;
 const baseDelay = 1000;
 
 const {
@@ -50,7 +53,7 @@ const limiter = new Bottleneck({
 
 const autoUpdater = require('./autoUpdater');
 
-if (cluster.isMaster) {
+if (false) {
   cluster.fork();
 
   cluster.on('exit', () => {
@@ -174,24 +177,50 @@ if (cluster.isMaster) {
         throw new Error('At check open orders step');
       }
 
-      const candleMarkets = await Promise.all(scanMarkets.map(({ symbol }) => limiter.schedule(() => new Promise(async (resolve, reject) => {
+      const lastScannedIndex = scanMarkets.findIndex(o => o.symbol === lastScannedSymbol);
+      const slicedScanMarkets = lastScannedIndex !== -1 ? scanMarkets.slice(lastScannedIndex) : scanMarkets;
+      const slicedScanMarketsLength = slicedScanMarkets.length;
+
+      const candleMarkets = await Promise.all(slicedScanMarkets.map(({ symbol }, index) => limiter.schedule(() => new Promise(async (resolve) => {
         try {
-          const boughtIndex = openOrders.findIndex(o => o.symbol === symbol);
-          if (boughtIndex === -1) {
-            const candles = await fetchCandle(exchange, symbol, timeFrame);
-            const ticker = await exchange.fetchTicker(symbol);
+          if (!shouldSkipAllSymbols) {
+            if ((index + 1) === slicedScanMarketsLength) {
+              lastScannedSymbol = null;
+            }
+            const boughtIndex = openOrders.findIndex(o => o.symbol === symbol);
+            if (boughtIndex === -1) {
+              const candles = await fetchCandle(exchange, symbol, timeFrame);
+              const ticker = await exchange.fetchTicker(symbol);
 
-            console.log(loggingMessage(`Scanning: ${symbol}`));
+              console.log(loggingMessage(`Scanning: ${symbol}`));
+              lastScannedSymbol = symbol;
 
-            resolve({
-              pair: symbol, ...candles, ...ticker,
-            });
+              if ((index + 1) === slicedScanMarketsLength) {
+                lastScannedSymbol = null;
+              }
+
+              resolve({
+                pair: symbol, ...candles, ...ticker,
+              });
+            } else {
+              resolve(null);
+            }
           } else {
             resolve(null);
           }
         } catch (e) {
           if (e.message.includes('429')) {
-            reject(e);
+            lastScannedSymbol = symbol;
+            shouldSkipAllSymbols = true;
+            shouldEnableCounterDDOS = true;
+            if (shouldSkipAllSymbols) {
+              limiter.updateSettings({
+                maxConcurrent: 1,
+                minTime: 0,
+              });
+            }
+
+            resolve(null);
           } else {
             resolve(null);
           }
@@ -255,6 +284,9 @@ if (cluster.isMaster) {
 
       if (compactListShouldBuy.length === 0) {
         console.log('There is nothing to buy at the moment');
+        if (shouldEnableCounterDDOS) {
+          throw new Error('429');
+        }
         throw new Error('At check list should buy step');
       }
 
@@ -297,12 +329,16 @@ if (cluster.isMaster) {
       throw new Error('Everything is fine');
     } catch (e) {
       try {
-        if (delay <= 10000 && e.message.includes('429')) {
-          delay += baseDelay;
-          limiter.updateSettings({
-            maxConcurrent: 1,
-            minTime: delay,
-          });
+        shouldSkipAllSymbols = false;
+        shouldEnableCounterDDOS = false;
+        if (e.message.includes('429')) {
+          if (delay < 5000) {
+            delay += baseDelay;
+            limiter.updateSettings({
+              maxConcurrent: 1,
+              minTime: delay,
+            });
+          }
         }
         const { dangling, bought } = await fs.readJSON('./trade.json');
         if (bought.length > 0) {

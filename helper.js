@@ -100,7 +100,7 @@ function restart(start, e) {
   if (e.message.includes('429')) {
     setTimeout(() => {
       start.call(this);
-    }, 5000);
+    }, 60000);
   } else {
     console.log(e.message);
     console.log('Resetting...');
