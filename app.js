@@ -332,7 +332,7 @@ if (false) {
         shouldSkipAllSymbols = false;
         shouldEnableCounterDDOS = false;
         if (e.message.includes('429')) {
-          if (delay < 5000) {
+          if (delay < 1000) {
             delay += baseDelay;
             limiter.updateSettings({
               maxConcurrent: 1,
