@@ -53,7 +53,7 @@ const limiter = new Bottleneck({
 
 const autoUpdater = require('./autoUpdater');
 
-if (false) {
+if (cluster.isMaster) {
   cluster.fork();
 
   cluster.on('exit', () => {
@@ -231,7 +231,7 @@ if (false) {
 
       const listShouldBuy = await Promise.all(compactCandleMarkets.map(({
         pair, opens, highs, lows, closes, vols, last, bid, quoteVolume, percentage,
-      }) => limiter.schedule(() => new Promise(async (resolve, reject) => {
+      }) => limiter.schedule(() => new Promise(async (resolve) => {
         try {
           const {
             baseRate, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff,
@@ -276,7 +276,7 @@ if (false) {
             resolve(null);
           }
         } catch (e) {
-          reject(e);
+          resolve(null);
         }
       }))));
 
