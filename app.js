@@ -331,15 +331,7 @@ if (cluster.isMaster) {
       try {
         shouldSkipAllSymbols = false;
         shouldEnableCounterDDOS = false;
-        if (e.message.includes('429')) {
-          if (delay < 1000) {
-            delay += baseDelay;
-            limiter.updateSettings({
-              maxConcurrent: 1,
-              minTime: delay,
-            });
-          }
-        }
+
         const { dangling, bought } = await fs.readJSON('./trade.json');
         if (bought.length > 0) {
           const markets = await exchange.fetchMarkets();
@@ -365,7 +357,7 @@ if (cluster.isMaster) {
                 resolve(false);
               } else if ((diffTime >= 24 && status === 'open') || (last <= stopLossPrice && diffTime >= 3 && status === 'open')) {
                 const cancel = await exchange.cancelOrder(id, pair);
-                console.log('Cancel sell order due to exceed time');
+                console.log('Cancel the selling order');
                 console.log(cancel);
                 resolve(true);
               } else {
@@ -404,8 +396,20 @@ if (cluster.isMaster) {
           const newBought = [...waitSell, ..._.compact(tempBought)];
           await fs.writeJSON('./trade.json', { dangling, bought: newBought });
         }
-        const shouldNormalReset = await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
-        if (shouldNormalReset) {
+
+        if (!e.message.includes('429')) {
+          const shouldNormalReset = await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
+          if (shouldNormalReset) {
+            restart(start, e);
+          }
+        } else {
+          if (delay < 1000) {
+            delay += baseDelay;
+            limiter.updateSettings({
+              maxConcurrent: 1,
+              minTime: delay,
+            });
+          }
           restart(start, e);
         }
       } catch (error) {
