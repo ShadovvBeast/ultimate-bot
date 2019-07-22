@@ -96,6 +96,22 @@ async function checkBuy(exchange, timeOrder, id, pair, telegram, telegramUserId)
   return buyFilled;
 }
 
+function checkBalance(marketName, marketBalance) {
+  let isAboveRequiredBalance = false;
+
+  if (marketName === 'BTC') {
+    isAboveRequiredBalance = marketBalance >= 0.001;
+  } else if (marketName === 'ETH') {
+    isAboveRequiredBalance = marketBalance >= 0.01;
+  } else if (marketName === 'BNB') {
+    isAboveRequiredBalance = marketBalance >= 0.1;
+  } else {
+    isAboveRequiredBalance = marketBalance >= 10;
+  }
+
+  return isAboveRequiredBalance;
+}
+
 function restart(start, e) {
   if (e.message.includes('429')) {
     setTimeout(() => {
@@ -278,7 +294,7 @@ function isAmountOk(pair, amount, rate, telegram, telegramUserId) {
   } else if (marketPlace === 'ETH') {
     checkAmount = (amount * rate) >= 0.01;
   } else if (marketPlace === 'BNB') {
-    checkAmount = (amount * rate) >= 1;
+    checkAmount = (amount * rate) >= 0.1;
   } else {
     checkAmount = (amount * rate) >= 10;
   }
@@ -453,5 +469,5 @@ function obvOscillatorRSI(closes, vols, period = 7) {
 }
 
 module.exports = {
-  loggingMessage, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, commonIndicator, upTrend, calculateAmount2Sell, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
+  loggingMessage, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, commonIndicator, upTrend, calculateAmount2Sell, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
 };

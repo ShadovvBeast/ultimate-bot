@@ -39,7 +39,7 @@ let shouldEnableCounterDDOS = false;
 const baseDelay = 1000;
 
 const {
-  loggingMessage, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, calculateAmount2Sell, commonIndicator, upTrend, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
+  loggingMessage, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, calculateAmount2Sell, commonIndicator, upTrend, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
 } = require('./helper');
 
 const {
@@ -123,8 +123,8 @@ if (cluster.isMaster) {
       const marketPlaceBalance = !_.isUndefined(accountBalance.free[marketPlace]) ? accountBalance.free[marketPlace] * (useFundPercentage / 100) : 0;
       const stableCoinBalance = !_.isUndefined(accountBalance.free[stableMarket]) ? accountBalance.free[stableMarket] : 0;
 
-      if (marketPlaceBalance < 0.001 && stableCoinBalance < 11) {
-        console.log(`You have too small ${marketPlace}, plzz deposit more or cancel open order`);
+      if (!checkBalance(marketPlace, marketPlaceBalance) && !checkBalance(stableMarket, stableCoinBalance)) {
+        console.log(`You have too small ${marketPlace} or ${stableMarket}, please deposit more or cancel open order`);
         throw new Error('At check balance step');
       }
 
@@ -138,7 +138,7 @@ if (cluster.isMaster) {
         const historyOrder = await exchange.fetchMyTrades(`${marketPlace}/${stableMarket}`);
         const isDoubleSellCheckOk = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'buy';
 
-        if (shouldSellSlowHeikin && marketPlaceBalance >= 0.001 && isDoubleSellCheckOk) {
+        if (shouldSellSlowHeikin && checkBalance(marketPlace, marketPlaceBalance) && isDoubleSellCheckOk) {
           const sellRef = await exchange.createLimitSellOrder(`${marketPlace}/${stableMarket}`, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
 
           messageTrade(sellRef, 'Sell', marketPlaceBalance, `${marketPlace}/${stableMarket}`, bid, telegram, telegramUserId);
@@ -157,11 +157,11 @@ if (cluster.isMaster) {
 
       let scanMarkets = [];
 
-      if (useStableMarket && stableCoinBalance >= 11 && marketPlaceBalance >= 0.001) {
+      if (useStableMarket && checkBalance(marketPlace, marketPlaceBalance) && checkBalance(stableMarket, stableCoinBalance)) {
         scanMarkets = [...filterMarkets, ...filterStableMarkets];
-      } else if (useStableMarket && stableCoinBalance >= 11) {
+      } else if (useStableMarket && checkBalance(stableMarket, stableCoinBalance)) {
         scanMarkets = filterStableMarkets;
-      } else if (marketPlaceBalance >= 0.001) {
+      } else if (checkBalance(marketPlace, marketPlaceBalance)) {
         scanMarkets = filterMarkets;
       }
 
