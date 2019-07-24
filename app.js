@@ -351,7 +351,7 @@ if (cluster.isMaster) {
               const stopLossPrice = boughtRate * stopLoss;
 
               if (status === 'closed') {
-                const mess = `[${moment().format('HH:mm:ss DD/MM/YYYY')}] - Sold ${filled} ${pair} at rate = ${price}`;
+                const mess = loggingMessage(`Sold ${filled} ${pair} at rate = ${price}`);
                 console.log(mess);
                 telegram.sendMessage(telegramUserId, mess);
                 resolve(false);
@@ -371,7 +371,7 @@ if (cluster.isMaster) {
             }
           })));
 
-          const tempBought = shouldStopLoss.length > 0 ? await Promise.all(shouldStopLoss.map(({ id, pair }) => limiter.schedule(() => new Promise(async (resolve, reject) => {
+          const tempBought = shouldStopLoss.length > 0 ? await Promise.all(shouldStopLoss.map(({ id, pair }) => limiter.schedule(() => new Promise(async (resolve) => {
             try {
               const { precision } = _.find(markets, o => o.symbol === pair);
               const { amount, filled } = await exchange.fetchOrder(id, pair);
@@ -389,7 +389,8 @@ if (cluster.isMaster) {
                 resolve(null);
               }
             } catch (error) {
-              reject(error);
+              waitSell.push({ id, pair });
+              resolve(null);
             }
           })))) : null;
 
