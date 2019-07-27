@@ -32,12 +32,6 @@ const ccxt = require('ccxt');
 const Bottleneck = require('bottleneck');
 const cluster = require('cluster');
 
-let delay = 0;
-let lastScannedSymbol;
-let shouldSkipAllSymbols = false;
-let shouldEnableCounterDDOS = false;
-const baseDelay = 1000;
-
 const {
   loggingMessage, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, calculateAmount2Sell, commonIndicator, upTrend, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
 } = require('./helper');
@@ -45,6 +39,20 @@ const {
 const {
   apiKey, secret, telegramUserId, marketPlace, useFundPercentage, takeProfitPct, stopLossPct, useStableMarket, stableMarket, timeOrder, timeFrame, timeFrameStableMarket, exchangeID,
 } = require('./config');
+
+let delay = 0;
+let lastScannedSymbol;
+let shouldSkipAllSymbols = false;
+let shouldEnableCounterDDOS = false;
+const baseDelay = 1000;
+
+const enhancedMarketPlace = marketPlace.toUpperCase();
+const enhancedStableMarket = stableMarket.toUpperCase();
+const enhancedExchangeID = exchangeID.toLowerCase();
+
+const ultimateLimiter = new Bottleneck({
+  maxConcurrent: 1,
+});
 
 const limiter = new Bottleneck({
   maxConcurrent: 1,
@@ -68,7 +76,7 @@ if (cluster.isMaster) {
   const telegram = new TelegramBot('746223720:AAFOzf75YuDp1N5xcHLV7EKozB7C0huuw2Y');
   console.log('Please use your Telegram app and find @onfqzmpgvrbot, tap /start in order for the bot send messages to you');
 
-  const exchange = new ccxt[exchangeID]({
+  const exchange = new ccxt[enhancedExchangeID]({
     apiKey,
     secret,
     options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
@@ -81,11 +89,23 @@ if (cluster.isMaster) {
     try {
       const { bought, dangling } = await fs.readJSON('./trade.json');
 
+      const checkMarketPlace = new RegExp(`${enhancedMarketPlace}$`, 'g');
+
+      const ultimateExchange = new ccxt.binance({
+        options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+      });
+      const ultimateMarkets = await ultimateExchange.fetchMarkets();
+      const ultimateFilterMarkets = ultimateMarkets.filter(o => o.active === true && o.quote === enhancedMarketPlace);
+      const ultimateFilterStableMarkets = ultimateMarkets.filter(o => o.active === true && o.quote === enhancedStableMarket);
+
       const markets = await exchange.fetchMarkets();
-      const checkMarketPlace = new RegExp(`${marketPlace}$`, 'g');
-      const checkStableMarkets = new RegExp(`${stableMarket}$`, 'g');
-      const filterMarkets = markets.filter(o => checkMarketPlace.test(o.symbol)).filter(o => o.active === true);
-      const filterStableMarkets = markets.filter(o => checkStableMarkets.test(o.symbol)).filter(o => o.active === true);
+      const filterMarkets = markets.filter(o => o.active === true && o.quote === enhancedMarketPlace);
+      const filterStableMarkets = markets.filter(o => o.active === true && o.quote === enhancedStableMarket);
+
+      const commonMarkets = _.intersectionBy(filterMarkets, ultimateFilterMarkets, 'symbol');
+      const commonStableMarkets = _.intersectionBy(filterStableMarkets, ultimateFilterStableMarkets, 'symbol');
+      const differentMarkets = _.differenceBy(filterMarkets, ultimateFilterMarkets, 'symbol');
+      const differentStableMarkets = _.differenceBy(filterStableMarkets, ultimateFilterStableMarkets, 'symbol');
 
       if (dangling.length > 0) {
         await Promise.all(dangling.map(({ id, pair }) => limiter.schedule(() => new Promise(async (resolve) => {
@@ -120,52 +140,52 @@ if (cluster.isMaster) {
 
       const accountBalance = await exchange.fetchBalance();
 
-      const marketPlaceBalance = !_.isUndefined(accountBalance.free[marketPlace]) ? accountBalance.free[marketPlace] * (useFundPercentage / 100) : 0;
-      const stableCoinBalance = !_.isUndefined(accountBalance.free[stableMarket]) ? accountBalance.free[stableMarket] : 0;
+      const marketPlaceBalance = !_.isUndefined(accountBalance.free[enhancedMarketPlace]) ? accountBalance.free[enhancedMarketPlace] * (useFundPercentage / 100) : 0;
+      const stableCoinBalance = !_.isUndefined(accountBalance.free[enhancedStableMarket]) ? accountBalance.free[enhancedStableMarket] : 0;
 
-      if (!checkBalance(marketPlace, marketPlaceBalance) && !checkBalance(stableMarket, stableCoinBalance)) {
-        console.log(`You have too small ${marketPlace} or ${stableMarket}, please deposit more or cancel open order`);
+      if (!checkBalance(enhancedMarketPlace, marketPlaceBalance) && !checkBalance(enhancedStableMarket, stableCoinBalance)) {
+        console.log(`You have too small ${enhancedMarketPlace} or ${enhancedStableMarket}, please deposit more or cancel open order`);
         throw new Error('At check balance step');
       }
 
       if (useStableMarket) {
-        const { precision: { amount, price } } = _.find(markets, o => o.symbol === `${marketPlace}/${stableMarket}`);
+        const { precision: { amount, price } } = _.find(markets, o => o.symbol === `${enhancedMarketPlace}/${enhancedStableMarket}`);
         const {
           opens, highs, lows, closes,
-        } = await fetchCandle(exchange, `${marketPlace}/${stableMarket}`, timeFrameStableMarket);
-        const { bid } = await exchange.fetchTicker(`${marketPlace}/${stableMarket}`);
+        } = await fetchCandle(exchange, `${enhancedMarketPlace}/${enhancedStableMarket}`, timeFrameStableMarket);
+        const { bid } = await exchange.fetchTicker(`${enhancedMarketPlace}/${enhancedStableMarket}`);
         const { shouldSellSlowHeikin } = slowHeikin(opens, highs, lows, closes, 6, 0.666, 0.0645);
-        const historyOrder = await exchange.fetchMyTrades(`${marketPlace}/${stableMarket}`);
+        const historyOrder = await exchange.fetchMyTrades(`${enhancedMarketPlace}/${enhancedStableMarket}`);
         const isDoubleSellCheckOk = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'buy';
 
-        if (shouldSellSlowHeikin && checkBalance(marketPlace, marketPlaceBalance) && isDoubleSellCheckOk) {
-          const sellRef = await exchange.createLimitSellOrder(`${marketPlace}/${stableMarket}`, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
+        if (shouldSellSlowHeikin && checkBalance(enhancedMarketPlace, marketPlaceBalance) && isDoubleSellCheckOk) {
+          const sellRef = await exchange.createLimitSellOrder(`${enhancedMarketPlace}/${enhancedStableMarket}`, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
 
-          messageTrade(sellRef, 'Sell', marketPlaceBalance, `${marketPlace}/${stableMarket}`, bid, telegram, telegramUserId);
+          messageTrade(sellRef, 'Sell', marketPlaceBalance, `${enhancedMarketPlace}/${enhancedStableMarket}`, bid, telegram, telegramUserId);
         }
       }
 
-      const marketPlaceInfo = await exchange.fetchTicker(`${marketPlace}/${stableMarket}`);
+      const marketPlaceInfo = await exchange.fetchTicker(`${enhancedMarketPlace}/${enhancedStableMarket}`);
       if (marketPlaceInfo.percentage >= 5 || marketPlaceInfo.percentage <= -7) {
         if (marketPlaceInfo.percentage >= 5) {
-          console.log(`The ${marketPlace} is going up too much, so it's better to pause for a while`);
+          console.log(`The ${enhancedMarketPlace} is going up too much, so it's better to pause for a while`);
         } else {
-          console.log(`The ${marketPlace} is going down too much, so it's better to pause for a while`);
+          console.log(`The ${enhancedMarketPlace} is going down too much, so it's better to pause for a while`);
         }
         throw new Error('At check is stable market step');
       }
 
       let scanMarkets = [];
 
-      if (useStableMarket && checkBalance(marketPlace, marketPlaceBalance) && checkBalance(stableMarket, stableCoinBalance)) {
-        scanMarkets = [...filterMarkets, ...filterStableMarkets];
-      } else if (useStableMarket && checkBalance(stableMarket, stableCoinBalance)) {
-        scanMarkets = filterStableMarkets;
-      } else if (checkBalance(marketPlace, marketPlaceBalance)) {
-        scanMarkets = filterMarkets;
+      if (useStableMarket && checkBalance(enhancedMarketPlace, marketPlaceBalance) && checkBalance(enhancedStableMarket, stableCoinBalance)) {
+        scanMarkets = { common: [...commonMarkets, ...commonStableMarkets], difference: [...differentMarkets, ...differentStableMarkets] };
+      } else if (useStableMarket && checkBalance(enhancedStableMarket, stableCoinBalance)) {
+        scanMarkets = { common: commonStableMarkets, difference: differentStableMarkets };
+      } else if (checkBalance(enhancedMarketPlace, marketPlaceBalance)) {
+        scanMarkets = { common: commonMarkets, difference: differentMarkets };
       }
 
-      if (scanMarkets.length === 0) {
+      if (scanMarkets.common.length === 0 && scanMarkets.difference.length === 0) {
         console.log('Doesn\'t have anything to scan');
         throw new Error('At check pairs to scan step');
       }
@@ -177,16 +197,45 @@ if (cluster.isMaster) {
         throw new Error('At check open orders step');
       }
 
-      const lastScannedIndex = scanMarkets.findIndex(o => o.symbol === lastScannedSymbol);
-      const slicedScanMarkets = lastScannedIndex !== -1 ? scanMarkets.slice(lastScannedIndex) : scanMarkets;
-      const slicedScanMarketsLength = slicedScanMarkets.length;
-
-      const candleMarkets = await Promise.all(slicedScanMarkets.map(({ symbol }, index) => limiter.schedule(() => new Promise(async (resolve) => {
+      const candleCommonMarkets = await Promise.all(scanMarkets.common.map(({ symbol }) => ultimateLimiter.schedule(() => new Promise(async (resolve) => {
         try {
+          // We we got banned, skip all remain pairs
           if (!shouldSkipAllSymbols) {
-            if ((index + 1) === slicedScanMarketsLength) {
+            const boughtIndex = openOrders.findIndex(o => o.symbol === symbol);
+            if (boughtIndex === -1) {
+              const candles = await fetchCandle(ultimateExchange, symbol, timeFrame);
+              const ticker = await ultimateExchange.fetchTicker(symbol);
+
+              console.log(loggingMessage(`Scanning: ${symbol}`));
+
+              resolve({
+                pair: symbol, ...candles, ...ticker,
+              });
+            } else {
+              resolve(null);
+            }
+          } else {
+            resolve(null);
+          }
+        } catch (e) {
+          resolve(null);
+        }
+      }))));
+
+      const lastScannedIndex = scanMarkets.difference.findIndex(o => o.symbol === lastScannedSymbol);
+      const slicedScanDifferentMarkets = lastScannedIndex !== -1 ? scanMarkets.difference.slice(lastScannedIndex) : scanMarkets.difference;
+      const slicedScanDifferentMarketsLength = slicedScanDifferentMarkets.length;
+
+      const candleDifferentMarkets = await Promise.all(slicedScanDifferentMarkets.map(({ symbol }, index) => limiter.schedule(() => new Promise(async (resolve) => {
+        try {
+          // We we got banned, skip all remain pairs
+          if (!shouldSkipAllSymbols) {
+            // If we reach to the end of array then reset lastScannedSymbol
+
+            if ((index + 1) === slicedScanDifferentMarketsLength) {
               lastScannedSymbol = null;
             }
+
             const boughtIndex = openOrders.findIndex(o => o.symbol === symbol);
             if (boughtIndex === -1) {
               const candles = await fetchCandle(exchange, symbol, timeFrame);
@@ -195,7 +244,7 @@ if (cluster.isMaster) {
               console.log(loggingMessage(`Scanning: ${symbol}`));
               lastScannedSymbol = symbol;
 
-              if ((index + 1) === slicedScanMarketsLength) {
+              if ((index + 1) === slicedScanDifferentMarketsLength) {
                 lastScannedSymbol = null;
               }
 
@@ -227,7 +276,7 @@ if (cluster.isMaster) {
         }
       }))));
 
-      const compactCandleMarkets = _.compact(candleMarkets);
+      const compactCandleMarkets = [..._.compact(candleCommonMarkets), ..._.compact(candleDifferentMarkets)];
 
       const listShouldBuy = await Promise.all(compactCandleMarkets.map(({
         pair, opens, highs, lows, closes, vols, last, bid, quoteVolume, percentage,
