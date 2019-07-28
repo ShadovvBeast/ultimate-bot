@@ -390,7 +390,7 @@ if (cluster.isMaster) {
             try {
               const { last } = await exchange.fetchTicker(pair);
               const {
-                price, datetime, status, filled,
+                price, datetime, status, filled, amount,
               } = await exchange.fetchOrder(id, pair);
 
               const currentTime = moment();
@@ -409,6 +409,18 @@ if (cluster.isMaster) {
                 console.log('Cancel the selling order');
                 console.log(cancel);
                 resolve(true);
+              } else if (status === 'canceled' && amount > 0) {
+                const re = /^\w+/;
+                const [coin] = pair.match(re);
+                const accountBalance = await exchange.fetchBalance();
+                const coinBalance = !_.isUndefined(accountBalance.free[coin]) ? accountBalance.free[coin] : 0;
+
+                if (coinBalance >= amount) {
+                  console.log('The order is canceled but it wasn\'t sold. Reset the stop loss operation');
+                  resolve(true);
+                } else {
+                  resolve(false);
+                }
               } else {
                 waitSell.push({ id, pair });
                 resolve(false);
