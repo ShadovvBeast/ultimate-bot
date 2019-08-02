@@ -5,7 +5,7 @@ const fs = require('fs-extra');
 
 module.exports = async (url) => {
   try {
-    const { version, dependencies } = await fs.readJSON('./package.json');
+    const { name, version, dependencies } = await fs.readJSON('./package.json');
     const fetchRemotePackage = await axios.get('https://raw.githubusercontent.com/dotai2012/ultimate-bot/master/package.json');
     const remoteVersion = fetchRemotePackage.data.version;
     const remoteDependencies = fetchRemotePackage.data.dependencies;
@@ -21,16 +21,14 @@ module.exports = async (url) => {
 
       file.once('finish', async () => {
         const zip = new AdmZip('master.zip');
-        const zipEntries = zip.getEntries();
-        const rootFolder = zipEntries[0].entryName;
-        zipEntries.map(({ entryName, name }, index) => {
-          if (index !== 0) {
-            const stripRootFolder = entryName.replace(rootFolder, '').replace(name, '');
-            zip.extractEntryTo(entryName, `./${stripRootFolder}`, false, true);
-          }
-        });
+        zip.extractAllTo('./', true);
+
+        const extractedFolder = `./${name}-master`;
+        const listEntries = await fs.readdir(extractedFolder);
+        await Promise.all(listEntries.map(async entry => fs.move(`${extractedFolder}/${entry}`, `./${entry}`, { overwrite: true })));
 
         await fs.remove('master.zip');
+        await fs.remove(extractedFolder);
 
         const dependenciesKey = Object.keys(dependencies);
         const remoteDependenciesKey = Object.keys(remoteDependencies);
