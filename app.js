@@ -7,17 +7,15 @@ const fs = require('fs-extra');
 const TelegramBot = require('node-telegram-bot-api');
 
 // Notify user update // TODO: remove this after the next version
-(async function notifyUpdate() {
-  try {
-    const { telegramUserId } = await fs.readJSON('./config.json');
-    if (telegramUserId !== '') {
-      const telegram = new TelegramBot('746223720:AAFOzf75YuDp1N5xcHLV7EKozB7C0huuw2Y');
-      telegram.sendMessage(telegramUserId, 'WARNING: This is a major update. You might need to reinstall (run npm install command in the CMD) again in order for the bot work properly. New document file can be found here: https://mega.nz/#!MJEEVA7Z!CrlfswDoSQkltkXW8q7zi-mzZ8zZxW6VaOh7_ZQMmcw');
-    }
-  } catch (e) {
-    console.log(e);
+try {
+  const { telegramUserId } = fs.readJSONSync('./config.json');
+  if (telegramUserId !== '') {
+    const telegram = new TelegramBot('746223720:AAFOzf75YuDp1N5xcHLV7EKozB7C0huuw2Y');
+    telegram.sendMessage(telegramUserId, 'WARNING: This is a major update. You need to reinstall (run npm install command in the CMD) again in order for the bot work properly. Please delete the old bot and install the new one here: https://drive.google.com/drive/folders/1-VtMykeBwrvg2_hltLhL1C44ZM07wCkg');
   }
-}());
+} catch (e) {
+  console.log(e);
+}
 // Notify user update
 
 const cluster = require('cluster');
