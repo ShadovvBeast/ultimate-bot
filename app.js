@@ -9,330 +9,330 @@ const TelegramBot = require('node-telegram-bot-api');
 // Notify user update // TODO: remove this after the next version
 try {
   const { telegramUserId } = fs.readJSONSync('./config.json');
-  if (telegramUserId !== '') {
-    const telegram = new TelegramBot('746223720:AAFOzf75YuDp1N5xcHLV7EKozB7C0huuw2Y');
-    telegram.sendMessage(telegramUserId, 'WARNING: This is a major update. You need to reinstall (run npm install command in the CMD) again in order for the bot work properly. Please delete the old bot and install the new one here: https://drive.google.com/drive/folders/1-VtMykeBwrvg2_hltLhL1C44ZM07wCkg');
-  }
+  const telegram = new TelegramBot('746223720:AAFOzf75YuDp1N5xcHLV7EKozB7C0huuw2Y');
+  telegram.sendMessage(telegramUserId, 'WARNING: This is a major update. Please delete this old bot and install the new one here: https://drive.google.com/open?id=1BQjBmBGoYHg3afB74SXI3bKAwhTrEC92');
 } catch (e) {
   console.log(e);
 }
 // Notify user update
 
-const cluster = require('cluster');
-const ccxt = require('ccxt');
-const express = require('express');
-const autoReloadJson = require('auto-reload-json');
-const _ = require('lodash');
-const open = require('open');
+// TODO: enable this after the next version
 
-// Express server
-const app = express();
-const http = require('http').Server(app);
-const io = require('socket.io')(http);
-// Express server
+// const cluster = require('cluster');
+// const ccxt = require('ccxt');
+// const express = require('express');
+// const autoReloadJson = require('auto-reload-json');
+// const _ = require('lodash');
+// const open = require('open');
 
-const {
-  loggingMessage, calculateMinAmount, fetchMarket, fetchInfoPair, fetchActiveOrder, calculateAmount2Sell, ioEmitter,
-} = require('./helper');
-const { startStrategy, stopStrategy, setTelegram } = require('./strategy');
+// // Express server
+// const app = express();
+// const http = require('http').Server(app);
+// const io = require('socket.io')(http);
+// // Express server
 
-if (cluster.isMaster) {
-  cluster.fork();
+// const {
+//   loggingMessage, calculateMinAmount, fetchMarket, fetchInfoPair, fetchActiveOrder, calculateAmount2Sell, ioEmitter,
+// } = require('./helper');
+// const { startStrategy, stopStrategy, setTelegram } = require('./strategy');
 
-  cluster.on('exit', async () => {
-    const { general: { telegramToken }, current: { telegramUserId } } = await fs.readJSON('./setting.json');
-    if (telegramUserId !== '') {
-      console.log('New files are applied. Resetting...');
-      const telegram = new TelegramBot(telegramToken);
-      telegram.sendMessage(telegramUserId, 'An update is available. New files are applied.');
-    }
+// if (cluster.isMaster) {
+//   cluster.fork();
 
-    setTimeout(() => {
-      cluster.fork();
-    }, 60000);
-  });
-} else {
-  // Express server
-  const port = process.env.PORT || 3000;
+//   cluster.on('exit', async () => {
+//     const { general: { telegramToken }, current: { telegramUserId } } = await fs.readJSON('./setting.json');
+//     if (telegramUserId !== '') {
+//       console.log('New files are applied. Resetting...');
+//       const telegram = new TelegramBot(telegramToken);
+//       telegram.sendMessage(telegramUserId, 'An update is available. New files are applied.');
+//     }
 
-  app.use(express.static(__dirname));
+//     setTimeout(() => {
+//       cluster.fork();
+//     }, 60000);
+//   });
+// } else {
+//   // Express server
+//   const port = process.env.PORT || 3000;
 
-  app.get('/', (req, res) => {
-    res.sendFile(`${__dirname}/index.html`);
-  });
+//   app.use(express.static(__dirname));
 
-  io.on('connection', (socket) => {
-    console.log('a user connected');
-    socket.on('disconnect', () => {
-      console.log('user disconnected');
-    });
-  });
+//   app.get('/', (req, res) => {
+//     res.sendFile(`${__dirname}/index.html`);
+//   });
 
-  http.listen(port, async () => {
-    const endPoint = `http://localhost:${port}`;
-    console.log(`Server is up on ${endPoint}`);
-    await open(endPoint);
-  });
-  // Express server
+//   io.on('connection', (socket) => {
+//     console.log('a user connected');
+//     socket.on('disconnect', () => {
+//       console.log('user disconnected');
+//     });
+//   });
 
-  // Remember last states
-  global.shouldStop = false;
-  global.isRunning = false;
-  global.messages = [];
-  // Remember last states
+//   http.listen(port, async () => {
+//     const endPoint = `http://localhost:${port}`;
+//     console.log(`Server is up on ${endPoint}`);
+//     await open(endPoint);
+//   });
+//   // Express server
 
-  // Live Read Setting
-  const settings = autoReloadJson(`${__dirname}/setting.json`);
+//   // Remember last states
+//   global.shouldStop = false;
+//   global.isRunning = false;
+//   global.messages = [];
+//   // Remember last states
 
-  let exchange = new ccxt[settings.current.exchangeID]({
-    apiKey: settings.current.apiKey,
-    secret: settings.current.secret,
-    password: settings.current.password,
-    options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
-  });
+//   // Live Read Setting
+//   const settings = autoReloadJson(`${__dirname}/setting.json`);
 
-  io.on('connection', (socket) => {
-  // Reload previous messages, states
-    global.messages.slice(Math.max(global.messages.length - 20, 0)).map(({ triggerType, mess }) => io.emit(triggerType, mess));
-    io.emit('isRunning', global.isRunning);
+//   let exchange = new ccxt[settings.current.exchangeID]({
+//     apiKey: settings.current.apiKey,
+//     secret: settings.current.secret,
+//     password: settings.current.password,
+//     options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+//   });
 
-    // Fetch Market
-    socket.on('fetch:market', async () => {
-      try {
-        const fetchedMarket = await fetchMarket(exchange);
-        io.emit('fetch:market:return', fetchedMarket);
-      } catch (e) {
-        console.log(e);
-      }
-    });
+//   io.on('connection', (socket) => {
+//   // Reload previous messages, states
+//     global.messages.slice(Math.max(global.messages.length - 20, 0)).map(({ triggerType, mess }) => io.emit(triggerType, mess));
+//     io.emit('isRunning', global.isRunning);
 
-    // Fetch main coin
-    socket.on('fetch:infoMAIN', async (selectedCoinMAIN) => {
-      try {
-        const fetchedMainCoin = await fetchInfoPair(exchange, selectedCoinMAIN);
-        io.emit('fetch:infoMAIN:return', fetchedMainCoin);
-      } catch (e) {
-        console.log(e);
-      }
-    });
+//     // Fetch Market
+//     socket.on('fetch:market', async () => {
+//       try {
+//         const fetchedMarket = await fetchMarket(exchange);
+//         io.emit('fetch:market:return', fetchedMarket);
+//       } catch (e) {
+//         console.log(e);
+//       }
+//     });
 
-    // Calc amount to buy on Main
-    socket.on('amount', async ({ market, pair, percentage }) => {
-      try {
-        const { free } = await exchange.fetchBalance();
-        const { ask } = await exchange.fetchTicker(pair);
-        const minAmount = calculateMinAmount(pair, ask);
-        const orgAmount = free[market] / ask * percentage;
-        const amount = orgAmount >= minAmount ? orgAmount : minAmount;
-        io.emit('amount:return', amount);
-      } catch (e) {
-        console.log(e);
-      }
-    });
+//     // Fetch main coin
+//     socket.on('fetch:infoMAIN', async (selectedCoinMAIN) => {
+//       try {
+//         const fetchedMainCoin = await fetchInfoPair(exchange, selectedCoinMAIN);
+//         io.emit('fetch:infoMAIN:return', fetchedMainCoin);
+//       } catch (e) {
+//         console.log(e);
+//       }
+//     });
 
-    // Main start
-    socket.on('main-start', (data) => {
-      ioEmitter(io, 'general', loggingMessage('Starting the bot'));
-      startStrategy({
-        exchange, io, telegramUserId: settings.current.telegramUserId, ...data,
-      });
-    });
+//     // Calc amount to buy on Main
+//     socket.on('amount', async ({ market, pair, percentage }) => {
+//       try {
+//         const { free } = await exchange.fetchBalance();
+//         const { ask } = await exchange.fetchTicker(pair);
+//         const minAmount = calculateMinAmount(pair, ask);
+//         const orgAmount = free[market] / ask * percentage;
+//         const amount = orgAmount >= minAmount ? orgAmount : minAmount;
+//         io.emit('amount:return', amount);
+//       } catch (e) {
+//         console.log(e);
+//       }
+//     });
 
-    // Main stop
-    socket.on('main-stop', () => {
-      stopStrategy(io);
-    });
+//     // Main start
+//     socket.on('main-start', (data) => {
+//       ioEmitter(io, 'general', loggingMessage('Starting the bot'));
+//       startStrategy({
+//         exchange, io, telegramUserId: settings.current.telegramUserId, ...data,
+//       });
+//     });
 
-    // Orders page
-    // Fetch active order
-    let isFirstInitFetchOrder = true;
-    socket.on('fetch:order', async () => {
-      await fetchActiveOrder(exchange, io);
-      if (isFirstInitFetchOrder) {
-        isFirstInitFetchOrder = false;
-        setInterval(async () => {
-          await fetchActiveOrder(exchange, io);
-        }, 250000);
-      }
-    });
+//     // Main stop
+//     socket.on('main-stop', () => {
+//       stopStrategy(io);
+//     });
 
-    // Market Sell and Cancel btn
+//     // Orders page
+//     // Fetch active order
+//     let isFirstInitFetchOrder = true;
+//     socket.on('fetch:order', async () => {
+//       await fetchActiveOrder(exchange, io);
+//       if (isFirstInitFetchOrder) {
+//         isFirstInitFetchOrder = false;
+//         setInterval(async () => {
+//           await fetchActiveOrder(exchange, io);
+//         }, 250000);
+//       }
+//     });
 
-    socket.on('marketAction', async ({
-      symbol, orderId, action, remaining,
-    }) => {
-      try {
-        await exchange.cancelOrder(orderId, symbol);
-        const enhancedRemain = await calculateAmount2Sell(exchange, symbol, remaining);
-        if (action === 'market-buy') {
-          await exchange.createMarketBuyOrder(symbol, enhancedRemain);
-        } else if (action === 'market-sell') {
-          await exchange.createMarketSellOrder(symbol, enhancedRemain);
-        }
-        await fetchActiveOrder(exchange, io);
-      } catch (e) {
-        console.log(e);
-      }
-    });
+//     // Market Sell and Cancel btn
 
-    // Manual page
+//     socket.on('marketAction', async ({
+//       symbol, orderId, action, remaining,
+//     }) => {
+//       try {
+//         await exchange.cancelOrder(orderId, symbol);
+//         const enhancedRemain = await calculateAmount2Sell(exchange, symbol, remaining);
+//         if (action === 'market-buy') {
+//           await exchange.createMarketBuyOrder(symbol, enhancedRemain);
+//         } else if (action === 'market-sell') {
+//           await exchange.createMarketSellOrder(symbol, enhancedRemain);
+//         }
+//         await fetchActiveOrder(exchange, io);
+//       } catch (e) {
+//         console.log(e);
+//       }
+//     });
 
-    // Calc minAmount
+//     // Manual page
 
-    socket.on('minAmount', ([pair, rate]) => {
-      const minAmount = calculateMinAmount(pair, rate.value);
-      io.emit('minAmount:return', minAmount);
-    });
+//     // Calc minAmount
 
-    // Get rate
-    socket.on('fetch:infoPair', async (selectedCoin) => {
-      try {
-        const fetchedCoin = await fetchInfoPair(exchange, selectedCoin);
-        io.emit('fetch:infoPair:return', fetchedCoin);
-      } catch (e) {
-        console.log(e);
-      }
-    });
+//     socket.on('minAmount', ([pair, rate]) => {
+//       const minAmount = calculateMinAmount(pair, rate.value);
+//       io.emit('minAmount:return', minAmount);
+//     });
 
-    // Fetch balance to manually buy and sell
+//     // Get rate
+//     socket.on('fetch:infoPair', async (selectedCoin) => {
+//       try {
+//         const fetchedCoin = await fetchInfoPair(exchange, selectedCoin);
+//         io.emit('fetch:infoPair:return', fetchedCoin);
+//       } catch (e) {
+//         console.log(e);
+//       }
+//     });
 
-    socket.on('balance', async (market) => {
-      try {
-        const { free } = await exchange.fetchBalance();
-        const balance = free[market];
-        io.emit('balance:return', balance);
-      } catch (e) {
-        console.log(e);
-      }
-    });
+//     // Fetch balance to manually buy and sell
 
-    // Buy btn
+//     socket.on('balance', async (market) => {
+//       try {
+//         const { free } = await exchange.fetchBalance();
+//         const balance = free[market];
+//         io.emit('balance:return', balance);
+//       } catch (e) {
+//         console.log(e);
+//       }
+//     });
 
-    socket.on('manual:buy', async ([pair, rate, orderType, amount]) => {
-      try {
-        await exchange.createLimitBuyOrder(pair, amount.value, rate.value);
-        io.emit('manual:buy:return', 'successful');
-      } catch (e) {
-        io.emit('manual:buy:return', 'failed');
-        console.log(e);
-      }
-    });
+//     // Buy btn
 
-    // Sell btn
+//     socket.on('manual:buy', async ([pair, rate, orderType, amount]) => {
+//       try {
+//         await exchange.createLimitBuyOrder(pair, amount.value, rate.value);
+//         io.emit('manual:buy:return', 'successful');
+//       } catch (e) {
+//         io.emit('manual:buy:return', 'failed');
+//         console.log(e);
+//       }
+//     });
 
-    socket.on('manual:sell', async ([pair, rate, orderType, amount]) => {
-      try {
-        await exchange.createLimitSellOrder(pair, amount.value, rate.value);
-        io.emit('manual:sell:return', 'successful');
-      } catch (e) {
-        io.emit('manual:sell:return', 'failed');
-        console.log(e);
-      }
-    });
+//     // Sell btn
 
-    // Setting page
+//     socket.on('manual:sell', async ([pair, rate, orderType, amount]) => {
+//       try {
+//         await exchange.createLimitSellOrder(pair, amount.value, rate.value);
+//         io.emit('manual:sell:return', 'successful');
+//       } catch (e) {
+//         io.emit('manual:sell:return', 'failed');
+//         console.log(e);
+//       }
+//     });
 
-    socket.on('setting:get', () => {
-      io.emit('setting:get:return', settings);
-    });
+//     // Setting page
 
-    // Save general settings
-    socket.on('setting:general:save', async (data) => {
-      try {
-        let setting = {};
-        data.map(({ name, value }) => {
-          setting = { ...setting, [name]: value };
-        });
+//     socket.on('setting:get', () => {
+//       io.emit('setting:get:return', settings);
+//     });
 
-        setTelegram(setting.telegramToken);
+//     // Save general settings
+//     socket.on('setting:general:save', async (data) => {
+//       try {
+//         let setting = {};
+//         data.map(({ name, value }) => {
+//           setting = { ...setting, [name]: value };
+//         });
 
-        await fs.writeJSON('setting.json', { ...settings, general: setting });
-        io.emit('setting:get:return', { ...settings, general: setting });
-      } catch (e) {
-        console.log(e);
-      }
-    });
+//         setTelegram(setting.telegramToken);
 
-    // Change current account on selecting
-    socket.on('setting:currentAccount', async (name) => {
-      try {
-        const currentAccount = settings.list.find(o => o.name === name);
-        const {
-          exchangeID, apiKey, secret, password,
-        } = currentAccount;
+//         await fs.writeJSON('setting.json', { ...settings, general: setting });
+//         io.emit('setting:get:return', { ...settings, general: setting });
+//       } catch (e) {
+//         console.log(e);
+//       }
+//     });
 
-        exchange = new ccxt[exchangeID]({
-          apiKey,
-          secret,
-          password,
-          options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
-        });
+//     // Change current account on selecting
+//     socket.on('setting:currentAccount', async (name) => {
+//       try {
+//         const currentAccount = settings.list.find(o => o.name === name);
+//         const {
+//           exchangeID, apiKey, secret, password,
+//         } = currentAccount;
 
-        await fs.writeJSON('setting.json', { ...settings, current: currentAccount });
-        io.emit('setting:currentAccount:return', currentAccount);
-      } catch (e) {
-        console.log(e);
-      }
-    });
+//         exchange = new ccxt[exchangeID]({
+//           apiKey,
+//           secret,
+//           password,
+//           options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+//         });
 
-    // Update current account settings
-    socket.on('setting:save', async (data, oldAccountName) => {
-      try {
-        let setting = {};
-        data.map(({ name, value }) => {
-          setting = { ...setting, [name]: value };
-        });
-        const {
-          exchangeID, apiKey, secret, password,
-        } = setting;
+//         await fs.writeJSON('setting.json', { ...settings, current: currentAccount });
+//         io.emit('setting:currentAccount:return', currentAccount);
+//       } catch (e) {
+//         console.log(e);
+//       }
+//     });
 
-        exchange = new ccxt[exchangeID]({
-          apiKey,
-          secret,
-          password,
-          options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
-        });
+//     // Update current account settings
+//     socket.on('setting:save', async (data, oldAccountName) => {
+//       try {
+//         let setting = {};
+//         data.map(({ name, value }) => {
+//           setting = { ...setting, [name]: value };
+//         });
+//         const {
+//           exchangeID, apiKey, secret, password,
+//         } = setting;
 
-        const clonedList = _.cloneDeep(settings.list);
-        const oldAccountIndex = clonedList.findIndex(o => o.name === oldAccountName);
-        clonedList[oldAccountIndex] = setting;
+//         exchange = new ccxt[exchangeID]({
+//           apiKey,
+//           secret,
+//           password,
+//           options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+//         });
 
-        await fs.writeJSON('setting.json', { ...settings, current: setting, list: clonedList });
-        io.emit('setting:get:return', { ...settings, current: setting, list: clonedList });
-      } catch (e) {
-        console.log(e);
-      }
-    });
+//         const clonedList = _.cloneDeep(settings.list);
+//         const oldAccountIndex = clonedList.findIndex(o => o.name === oldAccountName);
+//         clonedList[oldAccountIndex] = setting;
 
-    // Add new account
-    socket.on('setting:post', async (data) => {
-      try {
-        let setting = {};
-        data.map(({ name, value }) => {
-          setting = { ...setting, [name]: value };
-        });
-        const clonedList = _.cloneDeep(settings.list);
-        clonedList.push(setting);
+//         await fs.writeJSON('setting.json', { ...settings, current: setting, list: clonedList });
+//         io.emit('setting:get:return', { ...settings, current: setting, list: clonedList });
+//       } catch (e) {
+//         console.log(e);
+//       }
+//     });
 
-        await fs.writeJSON('setting.json', { ...settings, list: clonedList });
-        io.emit('setting:get:return', { ...settings, list: clonedList });
-      } catch (e) {
-        console.log(e);
-      }
-    });
+//     // Add new account
+//     socket.on('setting:post', async (data) => {
+//       try {
+//         let setting = {};
+//         data.map(({ name, value }) => {
+//           setting = { ...setting, [name]: value };
+//         });
+//         const clonedList = _.cloneDeep(settings.list);
+//         clonedList.push(setting);
 
-    // Delete account
-    socket.on('setting:delete', async (name) => {
-      try {
-        const clonedList = _.cloneDeep(settings.list);
-        _.remove(clonedList, o => o.name === name);
+//         await fs.writeJSON('setting.json', { ...settings, list: clonedList });
+//         io.emit('setting:get:return', { ...settings, list: clonedList });
+//       } catch (e) {
+//         console.log(e);
+//       }
+//     });
 
-        await fs.writeJSON('setting.json', { ...settings, current: clonedList[0], list: clonedList });
-        io.emit('setting:currentAccount:return', clonedList[0]);
-        io.emit('setting:get:return', { ...settings, current: clonedList[0], list: clonedList });
-      } catch (e) {
-        console.log(e);
-      }
-    });
-  });
-}
+//     // Delete account
+//     socket.on('setting:delete', async (name) => {
+//       try {
+//         const clonedList = _.cloneDeep(settings.list);
+//         _.remove(clonedList, o => o.name === name);
+
+//         await fs.writeJSON('setting.json', { ...settings, current: clonedList[0], list: clonedList });
+//         io.emit('setting:currentAccount:return', clonedList[0]);
+//         io.emit('setting:get:return', { ...settings, current: clonedList[0], list: clonedList });
+//       } catch (e) {
+//         console.log(e);
+//       }
+//     });
+//   });
+// }
