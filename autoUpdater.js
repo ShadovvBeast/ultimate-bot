@@ -21,7 +21,14 @@ module.exports = async (url) => {
 
       file.once('finish', async () => {
         const zip = new AdmZip('master.zip');
-        zip.extractAllTo('./', true);
+        const zipEntries = zip.getEntries();
+        const rootFolder = zipEntries[0].entryName;
+        zipEntries.map(({ entryName, name }, index) => {
+          if (index !== 0) {
+            const stripRootFolder = entryName.replace(rootFolder, '').replace(name, '');
+            zip.extractEntryTo(entryName, `./${stripRootFolder}`, false, true);
+          }
+        });
 
         await fs.remove('master.zip');
 
