@@ -1,0 +1,23 @@
+{
+  "general": {
+    "telegramToken": "746223720:AAFOzf75YuDp1N5xcHLV7EKozB7C0huuw2Y"
+  },
+  "current": {
+    "name": "Default",
+    "exchangeID": "binance",
+    "apiKey": "",
+    "secret": "",
+    "password": "",
+    "telegramUserId": ""
+  },
+  "list": [
+    {
+      "name": "Default",
+      "exchangeID": "binance",
+      "apiKey": "",
+      "secret": "",
+      "password": "",
+      "telegramUserId": ""
+    }
+  ]
+}

@@ -1,6 +1,8 @@
 node_modules
 yarn.lock
+package-lock.json
 api.txt
 config.json
 trade.json
+setting.json
 master.zip

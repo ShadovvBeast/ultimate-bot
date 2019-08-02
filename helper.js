@@ -9,6 +9,48 @@ function loggingMessage(msg) {
   return `[${moment().format('HH:mm:ss DD/MM/YYYY')}] - ${msg}`;
 }
 
+function ioEmitter(io, triggerType, mess) {
+  console.log(mess);
+  io.emit(triggerType, mess);
+  global.messages.push({ triggerType, mess });
+}
+
+async function fetchInfoPair(exchange, symbol) {
+  const ticker = await exchange.fetchTicker(symbol);
+  return ticker;
+}
+
+async function fetchMarket(exchange) {
+  const markets = await exchange.fetchMarkets();
+  let pair = '';
+  markets.map(({ symbol }) => {
+    pair += `<option value="${symbol}">${symbol}</option>`;
+  });
+
+  return pair;
+}
+
+async function fetchActiveOrder(exchange, io) {
+  const openOrders = await exchange.fetchOpenOrders();
+  io.emit('listOrder', openOrders);
+}
+
+function calculateMinAmount(pair, rate) {
+  const re = /\w+$/;
+  const [market] = pair.match(re);
+  let minAmount;
+  if (market === 'BTC') {
+    minAmount = 0.001 / rate;
+  } else if (market === 'ETH') {
+    minAmount = 0.01 / rate;
+  } else if (market === 'BNB') {
+    minAmount = 1 / rate;
+  } else {
+    minAmount = 10 / rate;
+  }
+  return minAmount;
+}
+
 class AsyncArray extends Array {
   constructor(arr) {
     super();
@@ -56,12 +98,16 @@ async function writeBought(dangling, bought, pair, buyId, sellId = null) {
   await fs.writeJSON('./trade.json', { dangling: filterDangling, bought });
 }
 
-async function checkBuy(exchange, timeOrder, id, pair, telegram, telegramUserId) {
+async function checkBuy(exchange, timeOrder, id, pair, telegram, telegramUserId, io) {
   const timeBuy = moment();
   let buyRef;
-  const buyFilled = await new Promise((resolve) => {
+  const buyFilled = await new Promise((resolve, reject) => {
     const checkBuyInterval = setInterval(async () => {
       try {
+        if (global.shouldStop) {
+          clearInterval(checkBuyInterval);
+          reject(new Error('Stop the bot'));
+        }
         const currentTime = moment();
         const diffTime = moment.duration(currentTime.diff(timeBuy)).asMinutes();
         const ref = await exchange.fetchOrder(id, pair);
@@ -90,6 +136,7 @@ async function checkBuy(exchange, timeOrder, id, pair, telegram, telegramUserId)
 
   if (buyFilled > 0) {
     const { price } = buyRef;
+    ioEmitter(io, 'general', loggingMessage(`Bought ${buyFilled} ${pair} at rate = ${price}`));
     telegram.sendMessage(telegramUserId, loggingMessage(`Bought ${buyFilled} ${pair} at rate = ${price}`));
   }
 
@@ -112,24 +159,25 @@ function checkBalance(marketName, marketBalance) {
   return isAboveRequiredBalance;
 }
 
-function restart(start, e) {
+function restart(start, e, data) {
   if (e.message.includes('429')) {
     setTimeout(() => {
-      start.call(this);
+      start.call(this, data);
     }, 90000);
   } else {
     console.log(e.message);
     console.log('Resetting...');
     setTimeout(() => {
-      start.call(this);
+      start.call(this, data);
     }, 60000);
   }
 }
 
-function messageTrade(ref, side, amount, pair, rate, telegram, telegramUserId) {
+function messageTrade(ref, side, amount, pair, rate, telegram, telegramUserId, io, triggerType) {
   const mess = loggingMessage(`${side}: ${amount} ${pair} at rate = ${rate}`);
   console.log(mess);
   console.log(ref);
+  ioEmitter(io, triggerType, mess);
   telegram.sendMessage(telegramUserId, mess);
 }
 
@@ -469,5 +517,5 @@ function obvOscillatorRSI(closes, vols, period = 7) {
 }
 
 module.exports = {
-  loggingMessage, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, commonIndicator, upTrend, calculateAmount2Sell, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
+  loggingMessage, ioEmitter, fetchInfoPair, fetchMarket, fetchActiveOrder, calculateMinAmount, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, commonIndicator, upTrend, calculateAmount2Sell, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
 };

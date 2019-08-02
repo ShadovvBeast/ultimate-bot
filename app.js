@@ -3,480 +3,338 @@ process.on('unhandledRejection', (reason, p) => {
 });
 process.env.NTBA_FIX_319 = 1;
 
-Number.prototype.toFixedNumber = function (x, base) {
-  const pow = Math.pow(base || 10, x);
-  return +(Math.floor(this * pow) / pow);
-};
-
-Number.prototype.noExponents = function () {
-  const data = String(this).split(/[eE]/);
-  if (data.length == 1) return data[0];
-  let z = ''; const sign = this < 0 ? '-' : '';
-  const str = data[0].replace('.', '');
-  let mag = Number(data[1]) + 1;
-  if (mag < 0) {
-    z = `${sign}0.`;
-    while (mag++) z += '0';
-    return z + str.replace(/^\-/, '');
-  }
-  mag -= str.length;
-  while (mag--) z += '0';
-  return str + z;
-};
-
-const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs-extra');
-const _ = require('lodash');
-const moment = require('moment');
-const ccxt = require('ccxt');
-const Bottleneck = require('bottleneck');
+const TelegramBot = require('node-telegram-bot-api');
+
+// Notify user update // TODO: remove this after the next version
+(async function notifyUpdate() {
+  try {
+    const { telegramUserId } = await fs.readJSON('./config.json');
+    if (telegramUserId !== '') {
+      const telegram = new TelegramBot('746223720:AAFOzf75YuDp1N5xcHLV7EKozB7C0huuw2Y');
+      telegram.sendMessage(telegramUserId, 'WARNING: This is a major update. You might need to reinstall (run npm install command in the CMD) again in order for the bot work properly. New document file can be found here: https://mega.nz/#!MJEEVA7Z!CrlfswDoSQkltkXW8q7zi-mzZ8zZxW6VaOh7_ZQMmcw');
+    }
+  } catch (e) {
+    console.log(e);
+  }
+}());
+// Notify user update
+
 const cluster = require('cluster');
+const ccxt = require('ccxt');
+const express = require('express');
+const autoReloadJson = require('auto-reload-json');
+const _ = require('lodash');
+const open = require('open');
+
+// Express server
+const app = express();
+const http = require('http').Server(app);
+const io = require('socket.io')(http);
+// Express server
 
 const {
-  loggingMessage, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, calculateAmount2Sell, commonIndicator, upTrend, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
+  loggingMessage, calculateMinAmount, fetchMarket, fetchInfoPair, fetchActiveOrder, calculateAmount2Sell, ioEmitter,
 } = require('./helper');
-
-const {
-  apiKey, secret, telegramUserId, marketPlace, useFundPercentage, takeProfitPct, stopLossPct, useStableMarket, stableMarket, timeOrder, timeFrame, timeFrameStableMarket, exchangeID,
-} = require('./config');
-
-let delay = 0;
-let lastScannedSymbol;
-let shouldSkipAllSymbols = false;
-let shouldEnableCounterDDOS = false;
-const baseDelay = 1000;
-
-const enhancedMarketPlace = marketPlace.toUpperCase();
-const enhancedStableMarket = stableMarket.toUpperCase();
-const enhancedExchangeID = exchangeID.toLowerCase();
-
-const ultimateLimiter = new Bottleneck({
-  maxConcurrent: 1,
-});
-
-const limiter = new Bottleneck({
-  maxConcurrent: 1,
-  minTime: delay,
-});
-
-const autoUpdater = require('./autoUpdater');
+const { startStrategy, stopStrategy, setTelegram } = require('./strategy');
 
 if (cluster.isMaster) {
   cluster.fork();
 
-  cluster.on('exit', () => {
-    console.log('New files are applied. Resetting...');
-    const telegram = new TelegramBot('746223720:AAFOzf75YuDp1N5xcHLV7EKozB7C0huuw2Y');
-    telegram.sendMessage(telegramUserId, 'An update is available. New files are applied.');
+  cluster.on('exit', async () => {
+    const { general: { telegramToken }, current: { telegramUserId } } = await fs.readJSON('./setting.json');
+    if (telegramUserId !== '') {
+      console.log('New files are applied. Resetting...');
+      const telegram = new TelegramBot(telegramToken);
+      telegram.sendMessage(telegramUserId, 'An update is available. New files are applied.');
+    }
+
     setTimeout(() => {
       cluster.fork();
     }, 60000);
   });
 } else {
-  const telegram = new TelegramBot('746223720:AAFOzf75YuDp1N5xcHLV7EKozB7C0huuw2Y');
-  console.log('Please use your Telegram app and find @onfqzmpgvrbot, tap /start in order for the bot send messages to you');
+  // Express server
+  const port = process.env.PORT || 3000;
 
-  const exchange = new ccxt[enhancedExchangeID]({
-    apiKey,
-    secret,
+  app.use(express.static(__dirname));
+
+  app.get('/', (req, res) => {
+    res.sendFile(`${__dirname}/index.html`);
+  });
+
+  io.on('connection', (socket) => {
+    console.log('a user connected');
+    socket.on('disconnect', () => {
+      console.log('user disconnected');
+    });
+  });
+
+  http.listen(port, async () => {
+    const endPoint = `http://localhost:${port}`;
+    console.log(`Server is up on ${endPoint}`);
+    await open(endPoint);
+  });
+  // Express server
+
+  // Remember last states
+  global.shouldStop = false;
+  global.isRunning = false;
+  global.messages = [];
+  // Remember last states
+
+  // Live Read Setting
+  const settings = autoReloadJson(`${__dirname}/setting.json`);
+
+  let exchange = new ccxt[settings.current.exchangeID]({
+    apiKey: settings.current.apiKey,
+    secret: settings.current.secret,
+    password: settings.current.password,
     options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
   });
 
-  const takeProfit = (100 + takeProfitPct) / 100;
-  const stopLoss = (100 - stopLossPct) / 100;
+  io.on('connection', (socket) => {
+  // Reload previous messages, states
+    global.messages.slice(Math.max(global.messages.length - 20, 0)).map(({ triggerType, mess }) => io.emit(triggerType, mess));
+    io.emit('isRunning', global.isRunning);
 
-  (async function start() {
-    try {
-      const { bought, dangling } = await fs.readJSON('./trade.json');
-
-      const checkMarketPlace = new RegExp(`${enhancedMarketPlace}$`, 'g');
-
-      const ultimateExchange = new ccxt.binance({
-        options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
-      });
-      const ultimateMarkets = await ultimateExchange.fetchMarkets();
-      const ultimateFilterMarkets = ultimateMarkets.filter(o => o.active === true && o.quote === enhancedMarketPlace);
-      const ultimateFilterStableMarkets = ultimateMarkets.filter(o => o.active === true && o.quote === enhancedStableMarket);
-
-      const markets = await exchange.fetchMarkets();
-      const filterMarkets = markets.filter(o => o.active === true && o.quote === enhancedMarketPlace);
-      const filterStableMarkets = markets.filter(o => o.active === true && o.quote === enhancedStableMarket);
-
-      const commonMarkets = _.intersectionBy(filterMarkets, ultimateFilterMarkets, 'symbol');
-      const commonStableMarkets = _.intersectionBy(filterStableMarkets, ultimateFilterStableMarkets, 'symbol');
-      const differentMarkets = _.differenceBy(filterMarkets, ultimateFilterMarkets, 'symbol');
-      const differentStableMarkets = _.differenceBy(filterStableMarkets, ultimateFilterStableMarkets, 'symbol');
-
-      if (dangling.length > 0) {
-        await Promise.all(dangling.map(({ id, pair }) => limiter.schedule(() => new Promise(async (resolve) => {
-          try {
-            const { precision } = _.find(markets, o => o.symbol === pair);
-            const {
-              filled, status, symbol, price,
-            } = await exchange.fetchOrder(id, pair);
-
-            if (status === 'open') {
-              await exchange.cancelOrder(id, pair);
-            }
-
-            const rate2Sell = price * takeProfit;
-            const amount2Sell = await calculateAmount2Sell(exchange, pair, filled);
-            const checkAmount = isAmountOk(pair, amount2Sell, rate2Sell, telegram, telegramUserId);
-
-            if (filled > 0 && checkAmount) {
-              const sellRef = await exchange.createLimitSellOrder(symbol, amount2Sell.toFixedNumber(precision.amount).noExponents(), rate2Sell.toFixedNumber(precision.price).noExponents());
-              await writeBought(dangling, bought, pair, id, sellRef.id);
-              console.log('Unresolved order, selling dangling order');
-              messageTrade(sellRef, 'Sell', amount2Sell, symbol, rate2Sell, telegram, telegramUserId);
-            } else {
-              await writeBought(dangling, bought, pair, id);
-              resolve();
-            }
-          } catch (e) {
-            await writeBought(dangling, bought, pair, id);
-          }
-        }))));
-      }
-
-      const accountBalance = await exchange.fetchBalance();
-
-      const marketPlaceBalance = !_.isUndefined(accountBalance.free[enhancedMarketPlace]) ? accountBalance.free[enhancedMarketPlace] * (useFundPercentage / 100) : 0;
-      const stableCoinBalance = !_.isUndefined(accountBalance.free[enhancedStableMarket]) ? accountBalance.free[enhancedStableMarket] : 0;
-
-      if (!checkBalance(enhancedMarketPlace, marketPlaceBalance) && !checkBalance(enhancedStableMarket, stableCoinBalance)) {
-        console.log(`You have too small ${enhancedMarketPlace} or ${enhancedStableMarket}, please deposit more or cancel open order`);
-        throw new Error('At check balance step');
-      }
-
-      if (useStableMarket) {
-        const { precision: { amount, price } } = _.find(markets, o => o.symbol === `${enhancedMarketPlace}/${enhancedStableMarket}`);
-        const {
-          opens, highs, lows, closes,
-        } = await fetchCandle(exchange, `${enhancedMarketPlace}/${enhancedStableMarket}`, timeFrameStableMarket);
-        const { bid } = await exchange.fetchTicker(`${enhancedMarketPlace}/${enhancedStableMarket}`);
-        const { shouldSellSlowHeikin } = slowHeikin(opens, highs, lows, closes, 6, 0.666, 0.0645);
-        const historyOrder = await exchange.fetchMyTrades(`${enhancedMarketPlace}/${enhancedStableMarket}`);
-        const isDoubleSellCheckOk = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'buy';
-
-        if (shouldSellSlowHeikin && checkBalance(enhancedMarketPlace, marketPlaceBalance) && isDoubleSellCheckOk) {
-          const sellRef = await exchange.createLimitSellOrder(`${enhancedMarketPlace}/${enhancedStableMarket}`, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
-
-          messageTrade(sellRef, 'Sell', marketPlaceBalance, `${enhancedMarketPlace}/${enhancedStableMarket}`, bid, telegram, telegramUserId);
-        }
-      }
-
-      const marketPlaceInfo = await exchange.fetchTicker(`${enhancedMarketPlace}/${enhancedStableMarket}`);
-      if (marketPlaceInfo.percentage >= 5 || marketPlaceInfo.percentage <= -7) {
-        if (marketPlaceInfo.percentage >= 5) {
-          console.log(`The ${enhancedMarketPlace} is going up too much, so it's better to pause for a while`);
-        } else {
-          console.log(`The ${enhancedMarketPlace} is going down too much, so it's better to pause for a while`);
-        }
-        throw new Error('At check is stable market step');
-      }
-
-      let scanMarkets = [];
-
-      if (useStableMarket && checkBalance(enhancedMarketPlace, marketPlaceBalance) && checkBalance(enhancedStableMarket, stableCoinBalance)) {
-        scanMarkets = { common: [...commonMarkets, ...commonStableMarkets], difference: [...differentMarkets, ...differentStableMarkets] };
-      } else if (useStableMarket && checkBalance(enhancedStableMarket, stableCoinBalance)) {
-        scanMarkets = { common: commonStableMarkets, difference: differentStableMarkets };
-      } else if (checkBalance(enhancedMarketPlace, marketPlaceBalance)) {
-        scanMarkets = { common: commonMarkets, difference: differentMarkets };
-      }
-
-      if (scanMarkets.common.length === 0 && scanMarkets.difference.length === 0) {
-        console.log('Doesn\'t have anything to scan');
-        throw new Error('At check pairs to scan step');
-      }
-
-      const openOrders = await exchange.fetchOpenOrders();
-
-      if (openOrders.length >= 2) {
-        console.log('Waiting for other open orders are filled');
-        throw new Error('At check open orders step');
-      }
-
-      const candleCommonMarkets = await Promise.all(scanMarkets.common.map(({ symbol }) => ultimateLimiter.schedule(() => new Promise(async (resolve) => {
-        try {
-          // We we got banned, skip all remain pairs
-          if (!shouldSkipAllSymbols) {
-            const boughtIndex = openOrders.findIndex(o => o.symbol === symbol);
-            if (boughtIndex === -1) {
-              const candles = await fetchCandle(ultimateExchange, symbol, timeFrame);
-              const ticker = await ultimateExchange.fetchTicker(symbol);
-
-              console.log(loggingMessage(`Scanning: ${symbol}`));
-
-              resolve({
-                pair: symbol, ...candles, ...ticker,
-              });
-            } else {
-              resolve(null);
-            }
-          } else {
-            resolve(null);
-          }
-        } catch (e) {
-          resolve(null);
-        }
-      }))));
-
-      const lastScannedIndex = scanMarkets.difference.findIndex(o => o.symbol === lastScannedSymbol);
-      const slicedScanDifferentMarkets = lastScannedIndex !== -1 ? scanMarkets.difference.slice(lastScannedIndex) : scanMarkets.difference;
-      const slicedScanDifferentMarketsLength = slicedScanDifferentMarkets.length;
-
-      const candleDifferentMarkets = await Promise.all(slicedScanDifferentMarkets.map(({ symbol }, index) => limiter.schedule(() => new Promise(async (resolve) => {
-        try {
-          // We we got banned, skip all remain pairs
-          if (!shouldSkipAllSymbols) {
-            // If we reach to the end of array then reset lastScannedSymbol
-
-            if ((index + 1) === slicedScanDifferentMarketsLength) {
-              lastScannedSymbol = null;
-            }
-
-            const boughtIndex = openOrders.findIndex(o => o.symbol === symbol);
-            if (boughtIndex === -1) {
-              const candles = await fetchCandle(exchange, symbol, timeFrame);
-              const ticker = await exchange.fetchTicker(symbol);
-
-              console.log(loggingMessage(`Scanning: ${symbol}`));
-              lastScannedSymbol = symbol;
-
-              if ((index + 1) === slicedScanDifferentMarketsLength) {
-                lastScannedSymbol = null;
-              }
-
-              resolve({
-                pair: symbol, ...candles, ...ticker,
-              });
-            } else {
-              resolve(null);
-            }
-          } else {
-            resolve(null);
-          }
-        } catch (e) {
-          if (e.message.includes('429')) {
-            lastScannedSymbol = symbol;
-            shouldSkipAllSymbols = true;
-            shouldEnableCounterDDOS = true;
-            if (shouldSkipAllSymbols) {
-              limiter.updateSettings({
-                maxConcurrent: 1,
-                minTime: 0,
-              });
-            }
-
-            resolve(null);
-          } else {
-            resolve(null);
-          }
-        }
-      }))));
-
-      const compactCandleMarkets = [..._.compact(candleCommonMarkets), ..._.compact(candleDifferentMarkets)];
-
-      const listShouldBuy = await Promise.all(compactCandleMarkets.map(({
-        pair, opens, highs, lows, closes, vols, last, bid, quoteVolume, percentage,
-      }) => limiter.schedule(() => new Promise(async (resolve) => {
-        try {
-          const {
-            baseRate, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff,
-          } = await commonIndicator(exchange, highs, lows, closes, last, pair);
-          const shouldBuyUpTrend = upTrend(opens, highs, lows, closes);
-          const shouldBuySmmothedHeikin = smoothedHeikin(opens, highs, lows, closes, 14);
-          const { shouldBuySlowHeikin } = slowHeikin(opens, highs, lows, closes, 6, 0.666, 0.0645);
-
-          const OBVOscRSIVal = obvOscillatorRSI(closes, vols, 7);
-
-          const volOscRSI = _.last(OBVOscRSIVal) - OBVOscRSIVal[OBVOscRSIVal.length - 2];
-          const volDiff = bidVol / askVol;
-          const volChecker = volDiff >= 0.75 || volOscRSI > 0;
-
-          const lastClose = _.last(closes);
-
-          const baseCondition = last >= 0.000001 && last <= lastEMA && spikyVal <= 3.5 && changeBB >= 1.08 && quoteVolume >= 1 && orderThickness >= 0.95 && volChecker && closeDiff <= 1.025;
-          const strategyResult = loggingMessage(`Calculating Strategy: ${pair} - Result:`);
-
-          if (last <= baseRate && lastRSI <= 35 && baseCondition) {
-            console.log(strategyResult, 'SUCCESS');
-            resolve({
-              pair, percentage, bid, baseRate, method: 'Dip',
-            });
-          } else if (shouldBuySmmothedHeikin && lastPSAR <= lastClose && baseCondition) {
-            console.log(strategyResult, 'SUCCESS');
-            resolve({
-              pair, percentage, bid, baseRate, method: 'Smoothed Heikin',
-            });
-          } else if (shouldBuySlowHeikin && lastPSAR <= lastClose && baseCondition) {
-            console.log(strategyResult, 'SUCCESS');
-            resolve({
-              pair, percentage, bid, baseRate, method: 'Slow Heikin',
-            });
-          } else if (shouldBuyUpTrend && baseCondition) {
-            console.log(strategyResult, 'SUCCESS');
-            resolve({
-              pair, percentage, bid, baseRate, method: 'Top',
-            });
-          } else {
-            console.log(strategyResult, 'FAIL');
-            resolve(null);
-          }
-        } catch (e) {
-          resolve(null);
-        }
-      }))));
-
-      const compactListShouldBuy = _.compact(listShouldBuy);
-
-      if (compactListShouldBuy.length === 0) {
-        console.log('There is nothing to buy at the moment');
-        if (shouldEnableCounterDDOS) {
-          throw new Error('429');
-        }
-        throw new Error('At check list should buy step');
-      }
-
-      if (compactListShouldBuy.length > 0) {
-        const {
-          pair, bid, baseRate, method,
-        } = _.minBy(compactListShouldBuy, 'percentage');
-        const { precision: { amount, price } } = _.find(markets, o => o.symbol === pair);
-        let rate2Buy;
-
-        rate2Buy = method === 'Dip' ? baseRate : bid;
-        if (rate2Buy > bid) {
-          rate2Buy = bid;
-        }
-
-        const targetBalance = checkMarketPlace.test(pair) ? marketPlaceBalance : stableCoinBalance;
-
-        const amount2Buy = (targetBalance / rate2Buy) * 0.9975;
-        const buyRef = await exchange.createLimitBuyOrder(pair, amount2Buy.toFixedNumber(amount).noExponents(), rate2Buy.toFixedNumber(price).noExponents());
-
-        await writeDangling(dangling, bought, pair, buyRef.id);
-        messageTrade(buyRef, `Buy (${method})`, amount2Buy, pair, rate2Buy, telegram, telegramUserId);
-
-        const buyFilled = await checkBuy(exchange, timeOrder, buyRef.id, pair, telegram, telegramUserId);
-
-        if (buyFilled > 0) {
-          const amount2Sell = await calculateAmount2Sell(exchange, pair, buyFilled);
-          const rate2Sell = rate2Buy * takeProfit;
-          const checkAmount = isAmountOk(pair, amount2Sell, rate2Sell, telegram, telegramUserId);
-
-          if (checkAmount) {
-            const sellRef = await exchange.createLimitSellOrder(pair, amount2Sell.toFixedNumber(amount).noExponents(), rate2Sell.toFixedNumber(price).noExponents());
-            messageTrade(sellRef, 'Sell', amount2Sell, pair, rate2Sell, telegram, telegramUserId);
-            await writeBought(dangling, bought, pair, buyRef.id, sellRef.id);
-          }
-        } else {
-          throw new Error('At check bought or not');
-        }
-      }
-      throw new Error('Everything is fine');
-    } catch (e) {
+    // Fetch Market
+    socket.on('fetch:market', async () => {
       try {
-        shouldSkipAllSymbols = false;
-        shouldEnableCounterDDOS = false;
-
-        const { dangling, bought } = await fs.readJSON('./trade.json');
-        if (bought.length > 0) {
-          const markets = await exchange.fetchMarkets();
-          const waitSell = [];
-          const boughtAsync = new AsyncArray(bought);
-          const shouldStopLoss = await boughtAsync.filterAsync(({ id, pair }) => limiter.schedule(() => new Promise(async (resolve) => {
-            try {
-              const { last } = await exchange.fetchTicker(pair);
-              const {
-                price, datetime, status, filled, amount,
-              } = await exchange.fetchOrder(id, pair);
-
-              const currentTime = moment();
-              const targetTime = moment(datetime);
-              const diffTime = moment.duration(currentTime.diff(targetTime)).asHours();
-              const boughtRate = price / takeProfit;
-              const stopLossPrice = boughtRate * stopLoss;
-
-              if (status === 'closed') {
-                const mess = loggingMessage(`Sold ${filled} ${pair} at rate = ${price}`);
-                console.log(mess);
-                telegram.sendMessage(telegramUserId, mess);
-                resolve(false);
-              } else if ((diffTime >= 24 && status === 'open') || (last <= stopLossPrice && diffTime >= 3 && status === 'open')) {
-                const cancel = await exchange.cancelOrder(id, pair);
-                console.log('Cancel the selling order');
-                console.log(cancel);
-                resolve(true);
-              } else if (status === 'canceled' && amount > 0) {
-                const re = /^\w+/;
-                const [coin] = pair.match(re);
-                const accountBalance = await exchange.fetchBalance();
-                const coinBalance = !_.isUndefined(accountBalance.free[coin]) ? accountBalance.free[coin] : 0;
-
-                if (coinBalance >= amount) {
-                  console.log('The order is canceled but it wasn\'t sold. Reset the stop loss operation');
-                  resolve(true);
-                } else {
-                  resolve(false);
-                }
-              } else {
-                waitSell.push({ id, pair });
-                resolve(false);
-              }
-            } catch (error) {
-              waitSell.push({ id, pair });
-              resolve(false);
-              console.log(e.message, 'It could be due to internet connection problems, re-checking the order...');
-            }
-          })));
-
-          const tempBought = shouldStopLoss.length > 0 ? await Promise.all(shouldStopLoss.map(({ id, pair }) => limiter.schedule(() => new Promise(async (resolve) => {
-            try {
-              const { precision } = _.find(markets, o => o.symbol === pair);
-              const { amount, filled } = await exchange.fetchOrder(id, pair);
-              const { bid } = await exchange.fetchTicker(pair);
-              const rate2StopLoss = bid * 0.99;
-              const remain = await calculateAmount2Sell(exchange, pair, amount - filled);
-              const checkAmount = isAmountOk(pair, remain, rate2StopLoss, telegram, telegramUserId);
-
-              if (checkAmount) {
-                const stopLossRef = await exchange.createLimitSellOrder(pair, remain.toFixedNumber(precision.amount).noExponents(), rate2StopLoss.toFixedNumber(precision.price).noExponents());
-
-                messageTrade(stopLossRef, 'Stop Loss', remain, pair, rate2StopLoss, telegram, telegramUserId);
-                resolve({ id: stopLossRef.id, pair });
-              } else {
-                resolve(null);
-              }
-            } catch (error) {
-              waitSell.push({ id, pair });
-              resolve(null);
-            }
-          })))) : null;
-
-          const newBought = [...waitSell, ..._.compact(tempBought)];
-          await fs.writeJSON('./trade.json', { dangling, bought: newBought });
-        }
-
-        if (!e.message.includes('429')) {
-          const shouldNormalReset = await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
-          if (shouldNormalReset) {
-            restart(start, e);
-          }
-        } else {
-          if (delay < 1000) {
-            delay += baseDelay;
-            limiter.updateSettings({
-              maxConcurrent: 1,
-              minTime: delay,
-            });
-          }
-          restart(start, e);
-        }
-      } catch (error) {
-        restart(start, error);
+        const fetchedMarket = await fetchMarket(exchange);
+        io.emit('fetch:market:return', fetchedMarket);
+      } catch (e) {
+        console.log(e);
       }
-    }
-  }());
+    });
+
+    // Fetch main coin
+    socket.on('fetch:infoMAIN', async (selectedCoinMAIN) => {
+      try {
+        const fetchedMainCoin = await fetchInfoPair(exchange, selectedCoinMAIN);
+        io.emit('fetch:infoMAIN:return', fetchedMainCoin);
+      } catch (e) {
+        console.log(e);
+      }
+    });
+
+    // Calc amount to buy on Main
+    socket.on('amount', async ({ market, pair, percentage }) => {
+      try {
+        const { free } = await exchange.fetchBalance();
+        const { ask } = await exchange.fetchTicker(pair);
+        const minAmount = calculateMinAmount(pair, ask);
+        const orgAmount = free[market] / ask * percentage;
+        const amount = orgAmount >= minAmount ? orgAmount : minAmount;
+        io.emit('amount:return', amount);
+      } catch (e) {
+        console.log(e);
+      }
+    });
+
+    // Main start
+    socket.on('main-start', (data) => {
+      ioEmitter(io, 'general', loggingMessage('Starting the bot'));
+      startStrategy({
+        exchange, io, telegramUserId: settings.current.telegramUserId, ...data,
+      });
+    });
+
+    // Main stop
+    socket.on('main-stop', () => {
+      stopStrategy(io);
+    });
+
+    // Orders page
+    // Fetch active order
+    let isFirstInitFetchOrder = true;
+    socket.on('fetch:order', async () => {
+      await fetchActiveOrder(exchange, io);
+      if (isFirstInitFetchOrder) {
+        isFirstInitFetchOrder = false;
+        setInterval(async () => {
+          await fetchActiveOrder(exchange, io);
+        }, 250000);
+      }
+    });
+
+    // Market Sell and Cancel btn
+
+    socket.on('marketAction', async ({
+      symbol, orderId, action, remaining,
+    }) => {
+      try {
+        await exchange.cancelOrder(orderId, symbol);
+        const enhancedRemain = await calculateAmount2Sell(exchange, symbol, remaining);
+        if (action === 'market-buy') {
+          await exchange.createMarketBuyOrder(symbol, enhancedRemain);
+        } else if (action === 'market-sell') {
+          await exchange.createMarketSellOrder(symbol, enhancedRemain);
+        }
+        await fetchActiveOrder(exchange, io);
+      } catch (e) {
+        console.log(e);
+      }
+    });
+
+    // Manual page
+
+    // Calc minAmount
+
+    socket.on('minAmount', ([pair, rate]) => {
+      const minAmount = calculateMinAmount(pair, rate.value);
+      io.emit('minAmount:return', minAmount);
+    });
+
+    // Get rate
+    socket.on('fetch:infoPair', async (selectedCoin) => {
+      try {
+        const fetchedCoin = await fetchInfoPair(exchange, selectedCoin);
+        io.emit('fetch:infoPair:return', fetchedCoin);
+      } catch (e) {
+        console.log(e);
+      }
+    });
+
+    // Fetch balance to manually buy and sell
+
+    socket.on('balance', async (market) => {
+      try {
+        const { free } = await exchange.fetchBalance();
+        const balance = free[market];
+        io.emit('balance:return', balance);
+      } catch (e) {
+        console.log(e);
+      }
+    });
+
+    // Buy btn
+
+    socket.on('manual:buy', async ([pair, rate, orderType, amount]) => {
+      try {
+        await exchange.createLimitBuyOrder(pair, amount.value, rate.value);
+        io.emit('manual:buy:return', 'successful');
+      } catch (e) {
+        io.emit('manual:buy:return', 'failed');
+        console.log(e);
+      }
+    });
+
+    // Sell btn
+
+    socket.on('manual:sell', async ([pair, rate, orderType, amount]) => {
+      try {
+        await exchange.createLimitSellOrder(pair, amount.value, rate.value);
+        io.emit('manual:sell:return', 'successful');
+      } catch (e) {
+        io.emit('manual:sell:return', 'failed');
+        console.log(e);
+      }
+    });
+
+    // Setting page
+
+    socket.on('setting:get', () => {
+      io.emit('setting:get:return', settings);
+    });
+
+    // Save general settings
+    socket.on('setting:general:save', async (data) => {
+      try {
+        let setting = {};
+        data.map(({ name, value }) => {
+          setting = { ...setting, [name]: value };
+        });
+
+        setTelegram(setting.telegramToken);
+
+        await fs.writeJSON('setting.json', { ...settings, general: setting });
+        io.emit('setting:get:return', { ...settings, general: setting });
+      } catch (e) {
+        console.log(e);
+      }
+    });
+
+    // Change current account on selecting
+    socket.on('setting:currentAccount', async (name) => {
+      try {
+        const currentAccount = settings.list.find(o => o.name === name);
+        const {
+          exchangeID, apiKey, secret, password,
+        } = currentAccount;
+
+        exchange = new ccxt[exchangeID]({
+          apiKey,
+          secret,
+          password,
+          options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+        });
+
+        await fs.writeJSON('setting.json', { ...settings, current: currentAccount });
+        io.emit('setting:currentAccount:return', currentAccount);
+      } catch (e) {
+        console.log(e);
+      }
+    });
+
+    // Update current account settings
+    socket.on('setting:save', async (data, oldAccountName) => {
+      try {
+        let setting = {};
+        data.map(({ name, value }) => {
+          setting = { ...setting, [name]: value };
+        });
+        const {
+          exchangeID, apiKey, secret, password,
+        } = setting;
+
+        exchange = new ccxt[exchangeID]({
+          apiKey,
+          secret,
+          password,
+          options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+        });
+
+        const clonedList = _.cloneDeep(settings.list);
+        const oldAccountIndex = clonedList.findIndex(o => o.name === oldAccountName);
+        clonedList[oldAccountIndex] = setting;
+
+        await fs.writeJSON('setting.json', { ...settings, current: setting, list: clonedList });
+        io.emit('setting:get:return', { ...settings, current: setting, list: clonedList });
+      } catch (e) {
+        console.log(e);
+      }
+    });
+
+    // Add new account
+    socket.on('setting:post', async (data) => {
+      try {
+        let setting = {};
+        data.map(({ name, value }) => {
+          setting = { ...setting, [name]: value };
+        });
+        const clonedList = _.cloneDeep(settings.list);
+        clonedList.push(setting);
+
+        await fs.writeJSON('setting.json', { ...settings, list: clonedList });
+        io.emit('setting:get:return', { ...settings, list: clonedList });
+      } catch (e) {
+        console.log(e);
+      }
+    });
+
+    // Delete account
+    socket.on('setting:delete', async (name) => {
+      try {
+        const clonedList = _.cloneDeep(settings.list);
+        _.remove(clonedList, o => o.name === name);
+
+        await fs.writeJSON('setting.json', { ...settings, current: clonedList[0], list: clonedList });
+        io.emit('setting:currentAccount:return', clonedList[0]);
+        io.emit('setting:get:return', { ...settings, current: clonedList[0], list: clonedList });
+      } catch (e) {
+        console.log(e);
+      }
+    });
+  });
 }

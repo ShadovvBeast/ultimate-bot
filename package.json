@@ -3,16 +3,24 @@
   "version": "3.3.1",
   "main": "app.js",
   "license": "MIT",
+  "description": "Ultimate bot",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/dotai2012/ultimate-bot.git"
+  },
   "dependencies": {
     "adm-zip": "^0.4.13",
+    "auto-reload-json": "^1.0.2",
     "axios": "^0.19.0",
     "bottleneck": "^2.19.4",
-    "ccxt": "^1.18.988",
+    "ccxt": "^1.18.999",
+    "express": "^4.17.1",
     "fs-extra": "^8.1.0",
     "lodash": "^4.17.15",
     "moment": "^2.24.0",
     "node-telegram-bot-api": "^0.30.0",
-    "prompts": "^2.1.0",
+    "open": "^6.4.0",
+    "socket.io": "^2.2.0",
     "technicalindicators": "^1.1.13"
   }
 }
