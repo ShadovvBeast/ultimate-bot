@@ -139,7 +139,7 @@ async function start(data) {
       const isDoubleBuy = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'buy';
       const isDoubleSell = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'sell';
 
-      if ((shouldBuySmoothedHeikin || shouldBuySlowHeikin) && checkBalance(enhancedMarketPlace, marketPlaceBalance) && baseCondition && volCheckerUp && lastPSAR < lastClose && orderThickness >= 0.95 && !isDoubleBuy) {
+      if ((shouldBuySmoothedHeikin || shouldBuySlowHeikin) && checkBalance(enhancedStableMarket, stableCoinBalance) && baseCondition && volCheckerUp && lastPSAR < lastClose && orderThickness >= 0.95 && !isDoubleBuy) {
         const buyRef = await exchange.createLimitSellOrder(pair, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
         await writeDangling(dangling, bought, pair, buyRef.id);
         messageTrade(buyRef, 'Buy', marketPlaceBalance, pair, bid, telegram, telegramUserId, io, 'trigger:buy');
