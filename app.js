@@ -44,9 +44,7 @@ if (cluster.isMaster) {
   });
 
   cluster.on('exit', async () => {
-    setTimeout(() => {
-      cluster.fork();
-    }, 60000);
+    cluster.fork();
   });
 } else {
   // Express server
