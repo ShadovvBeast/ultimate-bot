@@ -86,18 +86,19 @@ if (cluster.isMaster) {
     options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
   });
 
+  // Auto trigger
+  const checkLastStatesExists = fs.existsSync('last-states.json');
+  if (checkLastStatesExists && global.messages.length === 0 && !global.isRunning) {
+    const lastData = fs.readJSONSync('last-states.json');
+    startStrategy({
+      exchange, io, telegramUserId: settings.current.telegramUserId, ...lastData,
+    });
+  }
+
   io.on('connection', async (socket) => {
-  // Reload previous messages, states
+    // Reload previous messages, states
     global.messages.slice(Math.max(global.messages.length - 20, 0)).map(({ triggerType, mess }) => io.emit(triggerType, mess));
     io.emit('isRunning', global.isRunning);
-
-    const checkLastStatesExists = await fs.exists('last-states.json');
-    if (checkLastStatesExists && global.messages.length === 0 && !global.isRunning) {
-      const lastData = await fs.readJSON('last-states.json');
-      startStrategy({
-        exchange, io, telegramUserId: settings.current.telegramUserId, ...lastData,
-      });
-    }
     // Reload previous messages, states
 
     // Fetch Market
