@@ -120,19 +120,33 @@ async function start(data) {
     }
 
     if (useStableMarket) {
-      const { precision: { amount, price } } = _.find(markets, o => o.symbol === `${enhancedMarketPlace}/${enhancedStableMarket}`);
+      const pair = `${enhancedMarketPlace}/${enhancedStableMarket}`;
+      const { precision: { amount, price } } = _.find(markets, o => o.symbol === pair);
       const {
-        opens, highs, lows, closes,
-      } = await fetchCandle(exchange, `${enhancedMarketPlace}/${enhancedStableMarket}`, timeFrameStableMarket);
-      const { bid } = await exchange.fetchTicker(`${enhancedMarketPlace}/${enhancedStableMarket}`);
-      const { shouldSellSlowHeikin } = slowHeikin(opens, highs, lows, closes, 6, 0.666, 0.0645);
+        opens, highs, lows, closes, vols,
+      } = await fetchCandle(exchange, pair, timeFrameStableMarket);
+      const { bid, last } = await exchange.fetchTicker(pair);
+      const {
+        lastClose, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, closeDiff, volOscRSI, volDiff,
+      } = await commonIndicator(exchange, highs, lows, closes, vols, last, pair);
+      const { shouldBuySmoothedHeikin, shouldSellSmoothedHeikin } = smoothedHeikin(opens, highs, lows, closes, 14);
+      const { shouldBuySlowHeikin, shouldSellSlowHeikin } = slowHeikin(opens, highs, lows, closes, 6, 0.666, 0.0645);
+
+      const baseCondition = last <= lastEMA && spikyVal <= 3.5 && changeBB >= 1.08 && closeDiff <= 1.025;
+      const volCheckerDown = volDiff <= 0.95 || volOscRSI < 0;
+      const volCheckerUp = volDiff >= 0.75 || volOscRSI > 0;
       const historyOrder = await exchange.fetchMyTrades(`${enhancedMarketPlace}/${enhancedStableMarket}`);
-      const isDoubleSellCheckOk = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'buy';
+      const isDoubleBuy = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'buy';
+      const isDoubleSell = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'sell';
 
-      if (shouldSellSlowHeikin && checkBalance(enhancedMarketPlace, marketPlaceBalance) && isDoubleSellCheckOk) {
-        const sellRef = await exchange.createLimitSellOrder(`${enhancedMarketPlace}/${enhancedStableMarket}`, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
-
-        messageTrade(sellRef, 'Sell', marketPlaceBalance, `${enhancedMarketPlace}/${enhancedStableMarket}`, bid, telegram, telegramUserId, io, 'trigger:sell');
+      if ((shouldBuySmoothedHeikin || shouldBuySlowHeikin) && checkBalance(enhancedMarketPlace, marketPlaceBalance) && baseCondition && volCheckerUp && lastPSAR < lastClose && orderThickness >= 0.95 && !isDoubleBuy) {
+        const buyRef = await exchange.createLimitSellOrder(pair, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
+        await writeDangling(dangling, bought, pair, buyRef.id);
+        messageTrade(buyRef, 'Buy', marketPlaceBalance, pair, bid, telegram, telegramUserId, io, 'trigger:buy');
+        await checkBuy(exchange, timeOrder, buyRef.id, pair, telegram, telegramUserId, io);
+      } else if ((shouldSellSmoothedHeikin || shouldSellSlowHeikin) && checkBalance(enhancedMarketPlace, marketPlaceBalance) && baseCondition && volCheckerDown && lastPSAR > lastClose && orderThickness < 0.95 && !isDoubleSell) {
+        const sellRef = await exchange.createLimitSellOrder(pair, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
+        messageTrade(sellRef, 'Sell', marketPlaceBalance, pair, bid, telegram, telegramUserId, io, 'trigger:sell');
       }
     }
 
@@ -261,19 +275,13 @@ async function start(data) {
     }) => limiter.schedule(() => new Promise(async (resolve) => {
       try {
         const {
-          baseRate, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff,
-        } = await commonIndicator(exchange, highs, lows, closes, last, pair);
+          baseRate, lastClose, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, closeDiff, volOscRSI, volDiff,
+        } = await commonIndicator(exchange, highs, lows, closes, vols, last, pair);
         const shouldBuyUpTrend = upTrend(opens, highs, lows, closes);
-        const shouldBuySmmothedHeikin = smoothedHeikin(opens, highs, lows, closes, 14);
+        const { shouldBuySmoothedHeikin } = smoothedHeikin(opens, highs, lows, closes, 14);
         const { shouldBuySlowHeikin } = slowHeikin(opens, highs, lows, closes, 6, 0.666, 0.0645);
 
-        const OBVOscRSIVal = obvOscillatorRSI(closes, vols, 7);
-
-        const volOscRSI = _.last(OBVOscRSIVal) - OBVOscRSIVal[OBVOscRSIVal.length - 2];
-        const volDiff = bidVol / askVol;
         const volChecker = volDiff >= 0.75 || volOscRSI > 0;
-
-        const lastClose = _.last(closes);
 
         const baseCondition = last >= 0.000001 && last <= lastEMA && spikyVal <= 3.5 && changeBB >= 1.08 && quoteVolume >= 1 && orderThickness >= 0.95 && volChecker && closeDiff <= 1.025;
         const strategyResult = loggingMessage(`Calculating Strategy: ${pair} - Result:`);
@@ -283,12 +291,12 @@ async function start(data) {
           resolve({
             pair, percentage, bid, baseRate, method: 'Dip',
           });
-        } else if (shouldBuySmmothedHeikin && lastPSAR <= lastClose && baseCondition) {
+        } else if (shouldBuySmoothedHeikin && lastPSAR < lastClose && baseCondition) {
           console.log(strategyResult, 'SUCCESS');
           resolve({
             pair, percentage, bid, baseRate, method: 'Smoothed Heikin',
           });
-        } else if (shouldBuySlowHeikin && lastPSAR <= lastClose && baseCondition) {
+        } else if (shouldBuySlowHeikin && lastPSAR < lastClose && baseCondition) {
           console.log(strategyResult, 'SUCCESS');
           resolve({
             pair, percentage, bid, baseRate, method: 'Slow Heikin',
@@ -325,36 +333,43 @@ async function start(data) {
       const {
         pair, bid, baseRate, method,
       } = _.minBy(compactListShouldBuy, 'percentage');
-      const { precision: { amount, price } } = _.find(markets, o => o.symbol === pair);
-      let rate2Buy;
+      const historyOrder = await exchange.fetchMyTrades(pair);
+      const isDoubleBuy = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'buy';
 
-      rate2Buy = method === 'Dip' ? baseRate : bid;
-      if (rate2Buy > bid) {
-        rate2Buy = bid;
-      }
+      if (!isDoubleBuy) {
+        const { precision: { amount, price } } = _.find(markets, o => o.symbol === pair);
+        let rate2Buy;
 
-      const targetBalance = checkMarketPlace.test(pair) ? marketPlaceBalance : stableCoinBalance;
+        rate2Buy = method === 'Dip' ? baseRate : bid;
+        if (rate2Buy > bid) {
+          rate2Buy = bid;
+        }
 
-      const amount2Buy = (targetBalance / rate2Buy) * 0.9975;
-      const buyRef = await exchange.createLimitBuyOrder(pair, amount2Buy.toFixedNumber(amount).noExponents(), rate2Buy.toFixedNumber(price).noExponents());
+        const targetBalance = checkMarketPlace.test(pair) ? marketPlaceBalance : stableCoinBalance;
 
-      await writeDangling(dangling, bought, pair, buyRef.id);
-      messageTrade(buyRef, `Buy (${method})`, amount2Buy, pair, rate2Buy, telegram, telegramUserId, io, 'trigger:buy');
+        const amount2Buy = (targetBalance / rate2Buy) * 0.9975;
+        const buyRef = await exchange.createLimitBuyOrder(pair, amount2Buy.toFixedNumber(amount).noExponents(), rate2Buy.toFixedNumber(price).noExponents());
 
-      const buyFilled = await checkBuy(exchange, timeOrder, buyRef.id, pair, telegram, telegramUserId, io);
+        await writeDangling(dangling, bought, pair, buyRef.id);
+        messageTrade(buyRef, `Buy (${method})`, amount2Buy, pair, rate2Buy, telegram, telegramUserId, io, 'trigger:buy');
 
-      if (buyFilled > 0) {
-        const amount2Sell = await calculateAmount2Sell(exchange, pair, buyFilled);
-        const rate2Sell = rate2Buy * takeProfit;
-        const checkAmount = isAmountOk(pair, amount2Sell, rate2Sell, telegram, telegramUserId);
+        const buyFilled = await checkBuy(exchange, timeOrder, buyRef.id, pair, telegram, telegramUserId, io);
 
-        if (checkAmount) {
-          const sellRef = await exchange.createLimitSellOrder(pair, amount2Sell.toFixedNumber(amount).noExponents(), rate2Sell.toFixedNumber(price).noExponents());
-          messageTrade(sellRef, 'Sell', amount2Sell, pair, rate2Sell, telegram, telegramUserId, io, 'trigger:sell');
-          await writeBought(dangling, bought, pair, buyRef.id, sellRef.id);
+        if (buyFilled > 0) {
+          const amount2Sell = await calculateAmount2Sell(exchange, pair, buyFilled);
+          const rate2Sell = rate2Buy * takeProfit;
+          const checkAmount = isAmountOk(pair, amount2Sell, rate2Sell, telegram, telegramUserId);
+
+          if (checkAmount) {
+            const sellRef = await exchange.createLimitSellOrder(pair, amount2Sell.toFixedNumber(amount).noExponents(), rate2Sell.toFixedNumber(price).noExponents());
+            messageTrade(sellRef, 'Sell', amount2Sell, pair, rate2Sell, telegram, telegramUserId, io, 'trigger:sell');
+            await writeBought(dangling, bought, pair, buyRef.id, sellRef.id);
+          }
+        } else {
+          throw new Error('At check bought or not');
         }
       } else {
-        throw new Error('At check bought or not');
+        throw new Error('At check double buy');
       }
     }
     throw new Error('Everything is fine');
@@ -386,7 +401,7 @@ async function start(data) {
 
               if (status === 'closed') {
                 const mess = loggingMessage(`Sold ${filled} ${pair} at rate = ${price}`);
-                ioEmitter(io, 'general', mess);
+                ioEmitter(io, 'trigger:sell', mess);
                 telegram.sendMessage(telegramUserId, mess);
                 resolve(false);
               } else if ((diffTime >= 24 && status === 'open') || (last <= stopLossPrice && diffTime >= 3 && status === 'open')) {

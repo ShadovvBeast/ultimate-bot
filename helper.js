@@ -136,7 +136,7 @@ async function checkBuy(exchange, timeOrder, id, pair, telegram, telegramUserId,
 
   if (buyFilled > 0) {
     const { price } = buyRef;
-    ioEmitter(io, 'general', loggingMessage(`Bought ${buyFilled} ${pair} at rate = ${price}`));
+    ioEmitter(io, 'trigger:buy', loggingMessage(`Bought ${buyFilled} ${pair} at rate = ${price}`));
     telegram.sendMessage(telegramUserId, loggingMessage(`Bought ${buyFilled} ${pair} at rate = ${price}`));
   }
 
@@ -179,52 +179,6 @@ function messageTrade(ref, side, amount, pair, rate, telegram, telegramUserId, i
   console.log(ref);
   ioEmitter(io, triggerType, mess);
   telegram.sendMessage(telegramUserId, mess);
-}
-
-async function commonIndicator(exchange, highs, lows, closes, last, pair) {
-  const closeDiff = _.last(closes) / closes[closes.length - 2];
-
-  const BBVal = BollingerBands.calculate({
-    period: 20,
-    values: closes,
-    stdDev: 2,
-  });
-
-  const EMAVal = EMA.calculate({ period: 150, values: closes });
-
-  const RSIVal = RSI.calculate({ period: 14, values: closes });
-
-  const PSARVal = PSAR.calculate({
-    step: 0.0001,
-    max: 0.2,
-    high: highs,
-    low: lows,
-  });
-
-  const lastPSAR = _.last(PSARVal);
-  const lastBB = _.last(BBVal);
-  const lastRSI = _.last(RSIVal);
-  const lastEMA = _.last(EMAVal);
-  const changeBB = lastBB.upper / lastBB.lower;
-  const baseRate = lastBB.lower;
-
-  const minRate = _.min(closes);
-  const spikyVal = last / minRate;
-
-  const { bids, asks } = await exchange.fetchOrderBook(pair);
-
-  const limitBidOrderBook = bids.length > 10 ? 10 : bids.length;
-  const limitAskOrderBook = asks.length > 10 ? 10 : asks.length;
-
-  const bidVol = _.sum(bids.slice(0, limitBidOrderBook).map(([rate, vol]) => vol));
-
-  const askVol = _.sum(asks.slice(0, limitAskOrderBook).map(([rate, vol]) => vol));
-
-  const orderThickness = bids[limitBidOrderBook - 1][0] / bids[0][0];
-
-  return {
-    baseRate, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff,
-  };
 }
 
 function upTrend(opens, highs, lows, closes) {
@@ -422,13 +376,15 @@ function smoothedHeikin(opens, highs, lows, closes, period) {
     }
   }
 
-  const diffRSI = lastRSI >= 50 || lastRSI <= 40;
+  const diffRSI = lastRSI >= 55 || lastRSI <= 40;
 
   const isCompletedHeikinCandleGreen = (enhancedCloses[candleLength - 2] - enhancedOpens[candleLength - 2]) > 0;
+  const isPreviousHeikinCandleGreen = (enhancedCloses[candleLength - 3] - enhancedCloses[candleLength - 3]) > 0;
 
-  const shouldBuy = redCount === numCandleScan && isCompletedHeikinCandleGreen && diffRSI;
+  const shouldBuySmoothedHeikin = isCompletedHeikinCandleGreen && !isPreviousHeikinCandleGreen && redCount === numCandleScan && diffRSI;
+  const shouldSellSmoothedHeikin = !isCompletedHeikinCandleGreen && isPreviousHeikinCandleGreen && diffRSI;
 
-  return shouldBuy;
+  return { shouldBuySmoothedHeikin, shouldSellSmoothedHeikin };
 }
 
 function kama(smoothedCloses, fastEnd, slowEnd) {
@@ -477,7 +433,7 @@ function slowHeikin(opens, highs, lows, closes, period, fastEnd, slowEnd) {
   const isCompletedHeikinCandleGreen = (slowHeikinCandle.close[candleLength - 2] - heikinOpen[candleLength - 2]) > 0;
   const isPreviousHeikinCandleGreen = (slowHeikinCandle.close[candleLength - 3] - heikinOpen[candleLength - 3]) > 0;
 
-  const diffRSI = lastRSI >= 50 || lastRSI <= 40;
+  const diffRSI = lastRSI >= 55 || lastRSI <= 40;
 
   const numCandleScan = 5;
   const targetIndex = candleLength - numCandleScan - 3;
@@ -514,6 +470,58 @@ function obvOscillatorRSI(closes, vols, period = 7) {
   const OBVOscRSIVal = RSI.calculate({ period, values: OBVOscVal });
 
   return OBVOscRSIVal;
+}
+
+async function commonIndicator(exchange, highs, lows, closes, vols, last, pair) {
+  const closeDiff = _.last(closes) / closes[closes.length - 2];
+  const lastClose = _.last(closes);
+
+  const BBVal = BollingerBands.calculate({
+    period: 20,
+    values: closes,
+    stdDev: 2,
+  });
+
+  const EMAVal = EMA.calculate({ period: 150, values: closes });
+
+  const RSIVal = RSI.calculate({ period: 14, values: closes });
+
+  const PSARVal = PSAR.calculate({
+    step: 0.0001,
+    max: 0.2,
+    high: highs,
+    low: lows,
+  });
+
+  const lastPSAR = _.last(PSARVal);
+  const lastBB = _.last(BBVal);
+  const lastRSI = _.last(RSIVal);
+  const lastEMA = _.last(EMAVal);
+  const changeBB = lastBB.upper / lastBB.lower;
+  const baseRate = lastBB.lower;
+
+  const minRate = _.min(closes);
+  const spikyVal = last / minRate;
+
+  const { bids, asks } = await exchange.fetchOrderBook(pair);
+
+  const limitBidOrderBook = bids.length > 10 ? 10 : bids.length;
+  const limitAskOrderBook = asks.length > 10 ? 10 : asks.length;
+
+  const bidVol = _.sum(bids.slice(0, limitBidOrderBook).map(([rate, vol]) => vol));
+
+  const askVol = _.sum(asks.slice(0, limitAskOrderBook).map(([rate, vol]) => vol));
+
+  const orderThickness = bids[limitBidOrderBook - 1][0] / bids[0][0];
+
+  const OBVOscRSIVal = obvOscillatorRSI(closes, vols, 7);
+
+  const volOscRSI = _.last(OBVOscRSIVal) - OBVOscRSIVal[OBVOscRSIVal.length - 2];
+  const volDiff = bidVol / askVol;
+
+  return {
+    baseRate, lastClose, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff, volOscRSI, volDiff,
+  };
 }
 
 module.exports = {

@@ -26,14 +26,24 @@ const { startStrategy, stopStrategy, setTelegram } = require('./strategy');
 if (cluster.isMaster) {
   cluster.fork();
 
-  cluster.on('exit', async () => {
-    const { general: { telegramToken }, current: { telegramUserId } } = await fs.readJSON('./setting.json');
-    if (telegramUserId !== '') {
-      console.log('New files are applied. Resetting...');
-      const telegram = new TelegramBot(telegramToken);
-      telegram.sendMessage(telegramUserId, 'An update is available. New files are applied.');
+  let shouldOpenWebServer = true;
+  cluster.workers[1].on('message', async ({ endPoint, isUpdate }) => {
+    if (shouldOpenWebServer && endPoint) {
+      await open(endPoint);
+      shouldOpenWebServer = false;
     }
 
+    if (isUpdate) {
+      const { general: { telegramToken }, current: { telegramUserId } } = await fs.readJSON('./setting.json');
+      if (telegramUserId !== '') {
+        console.log('New files are applied. Resetting...');
+        const telegram = new TelegramBot(telegramToken);
+        telegram.sendMessage(telegramUserId, 'An update is available. New files are applied.');
+      }
+    }
+  });
+
+  cluster.on('exit', async () => {
     setTimeout(() => {
       cluster.fork();
     }, 60000);
@@ -58,7 +68,7 @@ if (cluster.isMaster) {
   http.listen(port, async () => {
     const endPoint = `http://localhost:${port}`;
     console.log(`Server is up on ${endPoint}`);
-    await open(endPoint);
+    process.send({ endPoint });
   });
   // Express server
 
@@ -78,10 +88,19 @@ if (cluster.isMaster) {
     options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
   });
 
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
   // Reload previous messages, states
     global.messages.slice(Math.max(global.messages.length - 20, 0)).map(({ triggerType, mess }) => io.emit(triggerType, mess));
     io.emit('isRunning', global.isRunning);
+
+    const checkLastStatesExists = await fs.exists('last-states.json');
+    if (checkLastStatesExists && global.messages.length === 0 && !global.isRunning) {
+      const lastData = await fs.readJSON('last-states.json');
+      startStrategy({
+        exchange, io, telegramUserId: settings.current.telegramUserId, ...lastData,
+      });
+    }
+    // Reload previous messages, states
 
     // Fetch Market
     socket.on('fetch:market', async () => {
@@ -118,16 +137,19 @@ if (cluster.isMaster) {
     });
 
     // Main start
-    socket.on('main-start', (data) => {
+    socket.on('main-start', async (data) => {
       ioEmitter(io, 'general', loggingMessage('Starting the bot'));
       startStrategy({
         exchange, io, telegramUserId: settings.current.telegramUserId, ...data,
       });
+
+      await fs.writeJSON('last-states.json', data);
     });
 
     // Main stop
-    socket.on('main-stop', () => {
+    socket.on('main-stop', async () => {
       stopStrategy(io);
+      await fs.remove('last-states.json');
     });
 
     // Orders page
