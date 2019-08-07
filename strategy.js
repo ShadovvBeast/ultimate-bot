@@ -136,15 +136,15 @@ async function start(data) {
       const volCheckerDown = volDiff <= 0.95 || volOscRSI < 0;
       const volCheckerUp = volDiff >= 0.75 || volOscRSI > 0;
       const historyOrder = await exchange.fetchMyTrades(`${enhancedMarketPlace}/${enhancedStableMarket}`);
-      const isDoubleBuy = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'buy';
-      const isDoubleSell = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'sell';
+      const isLastBuy = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'buy';
+      const isLastSell = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'sell';
 
-      if ((shouldBuySmoothedHeikin || shouldBuySlowHeikin) && checkBalance(enhancedStableMarket, stableCoinBalance) && baseCondition && volCheckerUp && lastPSAR < lastClose && orderThickness >= 0.95 && !isDoubleBuy) {
+      if ((shouldBuySmoothedHeikin || shouldBuySlowHeikin) && checkBalance(enhancedStableMarket, stableCoinBalance) && baseCondition && volCheckerUp && lastPSAR < lastClose && orderThickness >= 0.95 && isLastSell) {
         const buyRef = await exchange.createLimitSellOrder(pair, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
         await writeDangling(dangling, bought, pair, buyRef.id);
         messageTrade(buyRef, 'Buy', marketPlaceBalance, pair, bid, telegram, telegramUserId, io, 'trigger:buy');
         await checkBuy(exchange, timeOrder, buyRef.id, pair, telegram, telegramUserId, io);
-      } else if ((shouldSellSmoothedHeikin || shouldSellSlowHeikin) && checkBalance(enhancedMarketPlace, marketPlaceBalance) && baseCondition && volCheckerDown && lastPSAR > lastClose && orderThickness < 0.95 && !isDoubleSell) {
+      } else if ((shouldSellSmoothedHeikin || shouldSellSlowHeikin) && checkBalance(enhancedMarketPlace, marketPlaceBalance) && baseCondition && volCheckerDown && lastPSAR > lastClose && orderThickness < 0.95 && isLastBuy) {
         const sellRef = await exchange.createLimitSellOrder(pair, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
         messageTrade(sellRef, 'Sell', marketPlaceBalance, pair, bid, telegram, telegramUserId, io, 'trigger:sell');
       }
@@ -334,9 +334,9 @@ async function start(data) {
         pair, bid, baseRate, method,
       } = _.minBy(compactListShouldBuy, 'percentage');
       const historyOrder = await exchange.fetchMyTrades(pair);
-      const isDoubleBuy = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'buy';
+      const isLastSell = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'sell';
 
-      if (!isDoubleBuy) {
+      if (isLastSell) {
         const { precision: { amount, price } } = _.find(markets, o => o.symbol === pair);
         let rate2Buy;
 
