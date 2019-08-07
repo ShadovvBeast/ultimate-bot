@@ -45,6 +45,16 @@ $.fn.toggleClick = function () {
 $(document).ready(() => {
   // Home page
   // Init
+  const marketPlaceRef = $('#main-market-place');
+  const useFundPercentageRef = $('#main-amount-percentage');
+  const takeProfitPctRef = $('#main-take-profit');
+  const stopLossPctRef = $('#main-stop-loss');
+  const useStableMarketRef = $('#main-use-stable-market');
+  const stableMarketRef = $('#main-stable-market');
+  const timeOrderRef = $('#main-time-order');
+  const timeFrameRef = $('#main-time-frame');
+  const timeFrameStableMarketRef = $('#main-time-frame-stable-market');
+  const mainListRef = [marketPlaceRef, useFundPercentageRef, takeProfitPctRef, stopLossPctRef, useStableMarketRef, stableMarketRef, timeOrderRef, timeFrameRef, timeFrameStableMarketRef];
 
   // Reload previous states
   socket.on('isRunning', (isRunning) => {
@@ -56,6 +66,12 @@ $(document).ready(() => {
       $('#main-start').html('<i class="tim-icons icon-triangle-right-17"></i>Start');
     }
   });
+  socket.on('lastStates', (lastStates) => {
+    Object.keys(lastStates).map((key, index) => {
+      mainListRef[index].val(lastStates[key].toString());
+    });
+  });
+  // Reload previous states
 
   // Fetch Market
   // let intervalMAIN;
