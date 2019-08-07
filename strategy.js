@@ -340,7 +340,7 @@ async function start(data) {
         const { precision: { amount, price } } = _.find(markets, o => o.symbol === pair);
         let rate2Buy;
 
-        rate2Buy = method === 'Dip' ? baseRate : bid;
+        rate2Buy = method === 'Dip' ? baseRate * 0.975 : bid;
         if (rate2Buy > bid) {
           rate2Buy = bid;
         }
