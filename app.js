@@ -87,10 +87,9 @@ if (cluster.isMaster) {
   });
 
   // Auto trigger
-  const checkLastStatesExists = fs.existsSync('last-states.json') && global.messages.length === 0 && !global.isRunning;
-  let lastStates;
-  if (checkLastStatesExists) {
-    lastStates = fs.readJSONSync('last-states.json');
+  const checkLastStatesExists = () => fs.existsSync('last-states.json') && global.messages.length === 0 && !global.isRunning;
+  if (checkLastStatesExists()) {
+    const lastStates = fs.readJSONSync('last-states.json');
     startStrategy({
       exchange, io, telegramUserId: settings.current.telegramUserId, ...lastStates,
     });
@@ -100,7 +99,8 @@ if (cluster.isMaster) {
     // Reload previous messages, states
     global.messages.slice(Math.max(global.messages.length - 20, 0)).map(({ triggerType, mess }) => io.emit(triggerType, mess));
     io.emit('isRunning', global.isRunning);
-    if (lastStates) {
+    if (checkLastStatesExists()) {
+      const lastStates = await fs.readJSON('last-states.json');
       io.emit('lastStates', lastStates);
     }
     // Reload previous messages, states
