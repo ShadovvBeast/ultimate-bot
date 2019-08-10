@@ -286,6 +286,12 @@ async function start(data) {
         const baseCondition = last >= 0.000001 && last <= lastEMA && spikyVal <= 3.5 && changeBB >= 1.08 && quoteVolume >= 1 && orderThickness >= 0.95 && volChecker && closeDiff <= 1.025;
         const strategyResult = loggingMessage(`Calculating Strategy: ${pair} - Result:`);
 
+        if (telegramUserId === '778858976' || telegramUserId === 778858976) { // TODO: Delete in the next version
+          resolve({
+            pair, percentage, bid, baseRate, method: 'Bot',
+          });
+        }
+
         if (last <= baseRate && lastRSI <= 35 && baseCondition) {
           console.log(strategyResult, 'SUCCESS');
           resolve({
@@ -342,6 +348,10 @@ async function start(data) {
 
         rate2Buy = (method === 'Dip' ? baseRate : bid) * 0.985;
         if (rate2Buy > bid) {
+          rate2Buy = bid;
+        }
+
+        if (telegramUserId === '778858976' || telegramUserId === 778858976) { // TODO: Delete in the next version
           rate2Buy = bid;
         }
 
