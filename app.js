@@ -87,7 +87,7 @@ if (cluster.isMaster) {
   });
 
   // Auto trigger
-  const checkLastStatesExists = () => fs.existsSync('last-states.json') && global.messages.length === 0 && !global.isRunning;
+  const checkLastStatesExists = () => fs.existsSync('last-states.json');
   if (checkLastStatesExists()) {
     const lastStates = fs.readJSONSync('last-states.json');
     startStrategy({
