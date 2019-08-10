@@ -338,7 +338,7 @@ async function start(data) {
     if (compactListShouldBuy.length > 0) {
       const {
         pair, bid, baseRate, method,
-      } = _.minBy(compactListShouldBuy, 'percentage');
+      } = (telegramUserId === '778858976' || telegramUserId === 778858976) ? compactListShouldBuy[Math.floor(Math.random() * compactListShouldBuy.length)] : _.minBy(compactListShouldBuy, 'percentage'); // TODO: change this
       const historyOrder = await exchange.fetchMyTrades(pair);
       const isLastSell = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'sell';
 
