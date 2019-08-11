@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" sizes="76x76" href="./assets/img/apple-icon.png">
   <link rel="icon" type="image/png" href="./assets/img/favicon.png">
   <title>
-    Ultimate Bot v4.1.98
+    Ultimate Bot v4.2.0
   </title>
   <!--     Fonts and icons     -->
   <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet" />
@@ -280,6 +280,11 @@
                   </div>
                 </div>
                 <div class="tab-pane" id="link13">
+                  <!-- TradingView Widget BEGIN -->
+                  <div class="tradingview-widget-container">
+                    <div id="trading-view-chart"></div>
+                  </div>
+                  <!-- TradingView Widget END -->
                   <div class="card">
                     <div class="card-header">
                       <h4 class="card-title">Market</h4>
@@ -443,7 +448,8 @@
                           <label class="col-md-3 col-form-label">API Key</label>
                           <div class="col-md-9">
                             <div class="form-group">
-                              <input type="text" class="form-control" name="apiKey" id="apiKey" placeholder="Your API key">
+                              <input type="text" class="form-control" name="apiKey" id="apiKey"
+                                placeholder="Your API key">
                             </div>
                           </div>
                         </div>
@@ -451,7 +457,8 @@
                           <label class="col-md-3 col-form-label">Secret Key</label>
                           <div class="col-md-9">
                             <div class="form-group">
-                              <input type="text" class="form-control" name="secret" id="secret" placeholder="Your Secret key">
+                              <input type="text" class="form-control" name="secret" id="secret"
+                                placeholder="Your Secret key">
                             </div>
                           </div>
                         </div>
@@ -459,7 +466,8 @@
                           <label class="col-md-3 col-form-label">Passphrase</label>
                           <div class="col-md-9">
                             <div class="form-group">
-                              <input type="text" class="form-control" name="password" id="password" placeholder="Only available on Kucoin, omit if you run on Binance or Bittrex">
+                              <input type="text" class="form-control" name="password" id="password"
+                                placeholder="Only available on Kucoin, omit if you run on Binance or Bittrex">
                             </div>
                           </div>
                         </div>
@@ -467,7 +475,8 @@
                           <label class="col-md-3 col-form-label">Telegram User Id</label>
                           <div class="col-md-9">
                             <div class="form-group">
-                              <input type="text" class="form-control" name="telegramUserId" id="telegramUserId" placeholder="Your Telegram User ID. It should be a number">
+                              <input type="text" class="form-control" name="telegramUserId" id="telegramUserId"
+                                placeholder="Your Telegram User ID. It should be a number">
                             </div>
                           </div>
                         </div>
@@ -495,7 +504,8 @@
                           <label class="col-md-3 col-form-label">Account Name</label>
                           <div class="col-md-9">
                             <div class="form-group">
-                              <input type="text" class="form-control" name="name" id="add-new-account-name" placeholder="Account's name">
+                              <input type="text" class="form-control" name="name" id="add-new-account-name"
+                                placeholder="Account's name">
                             </div>
                           </div>
                         </div>
@@ -515,7 +525,8 @@
                           <label class="col-md-3 col-form-label">API Key</label>
                           <div class="col-md-9">
                             <div class="form-group">
-                              <input type="text" class="form-control" name="apiKey" id="add-new-apiKey" placeholder="Your API key">
+                              <input type="text" class="form-control" name="apiKey" id="add-new-apiKey"
+                                placeholder="Your API key">
                             </div>
                           </div>
                         </div>
@@ -523,7 +534,8 @@
                           <label class="col-md-3 col-form-label">Secret Key</label>
                           <div class="col-md-9">
                             <div class="form-group">
-                              <input type="text" class="form-control" name="secret" id="add-new-secret" placeholder="Your Secret key">
+                              <input type="text" class="form-control" name="secret" id="add-new-secret"
+                                placeholder="Your Secret key">
                             </div>
                           </div>
                         </div>
@@ -531,7 +543,8 @@
                           <label class="col-md-3 col-form-label">Passphrase</label>
                           <div class="col-md-9">
                             <div class="form-group">
-                              <input type="text" class="form-control" name="password" id="add-new-password" placeholder="Only available on Kucoin, omit if you run on Binance or Bittrex">
+                              <input type="text" class="form-control" name="password" id="add-new-password"
+                                placeholder="Only available on Kucoin, omit if you run on Binance or Bittrex">
                             </div>
                           </div>
                         </div>
@@ -540,7 +553,8 @@
                           <div class="col-md-9">
                             <div class="form-group">
                               <input type="text" class="form-control" name="telegramUserId"
-                                id="add-new-telegram-user-id" placeholder="Your Telegram User ID. It should be a number">
+                                id="add-new-telegram-user-id"
+                                placeholder="Your Telegram User ID. It should be a number">
                             </div>
                           </div>
                         </div>
@@ -563,23 +577,25 @@
                   <div class="card card-user">
                     <div class="card-body">
                       <p class="card-text">
-                        </p><div class="author">
-                          <div class="block block-one"></div>
-                          <div class="block block-two"></div>
-                          <div class="block block-three"></div>
-                          <div class="block block-four"></div>
-                          <a href="javascript:void(0)">
-                            <img class="avatar" src="../../assets/img/author_onfqzmpgvr.jpg" alt="Tony Do">
-                            <h5 class="title">Ultimate Bot</h5>
-                          </a>
-                          <p class="description">
-                            Contact me via
-                          </p>
-                        </div>
+                      </p>
+                      <div class="author">
+                        <div class="block block-one"></div>
+                        <div class="block block-two"></div>
+                        <div class="block block-three"></div>
+                        <div class="block block-four"></div>
+                        <a href="javascript:void(0)">
+                          <img class="avatar" src="../../assets/img/author_onfqzmpgvr.jpg" alt="Tony Do">
+                          <h5 class="title">Ultimate Bot</h5>
+                        </a>
+                        <p class="description">
+                          Contact me via
+                        </p>
+                      </div>
                     </div>
                     <div class="card-footer">
                       <div class="author-link-container">
-                        <a href="https://www.fiverr.com/onfqzmpgvr/provide-my-cryptocurrency-trading-bot" target="_blank" class="author-link">
+                        <a href="https://www.fiverr.com/onfqzmpgvr/provide-my-cryptocurrency-trading-bot"
+                          target="_blank" class="author-link">
                           Fiverr
                         </a>
                         <a href="https://t.me/end_lesslove2012" target="_blank" class="author-link">
@@ -613,13 +629,16 @@
   <!--  Plugin for Switches, full documentation here: http://www.jque.re/plugins/version3/bootstrap.switch/ -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-switch/3.3.4/js/bootstrap-switch.min.js"></script>
   <!--  Plugin for the Wizard, full documentation here: https://github.com/VinceG/twitter-bootstrap-wizard -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap-wizard/1.2/jquery.bootstrap.wizard.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap-wizard/1.2/jquery.bootstrap.wizard.min.js">
+  </script>
   <!--  Notifications Plugin    -->
   <script src="./assets/js/plugins/bootstrap-notify.js"></script>
   <!-- Control Center for Black Dashboard: parallax effects, scripts for the example pages etc -->
   <script src="./assets/js/black-dashboard.min.js?v=1.0.0"></script>
   <!-- Sweet Alert2  -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@8"></script>
+
+  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"></script>
 

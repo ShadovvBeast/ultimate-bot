@@ -286,12 +286,6 @@ async function start(data) {
         const baseCondition = last >= 0.000001 && last <= lastEMA && spikyVal <= 3.5 && changeBB >= 1.08 && quoteVolume >= 1 && orderThickness >= 0.95 && volChecker && closeDiff <= 1.025;
         const strategyResult = loggingMessage(`Calculating Strategy: ${pair} - Result:`);
 
-        if (telegramUserId === '778858976' || telegramUserId === 778858976) { // TODO: Delete in the next version
-          resolve({
-            pair, percentage, bid, baseRate, method: 'Bot',
-          });
-        }
-
         if (last <= baseRate && lastRSI <= 35 && baseCondition) {
           console.log(strategyResult, 'SUCCESS');
           resolve({
@@ -338,7 +332,7 @@ async function start(data) {
     if (compactListShouldBuy.length > 0) {
       const {
         pair, bid, baseRate, method,
-      } = (telegramUserId === '778858976' || telegramUserId === 778858976) ? compactListShouldBuy[Math.floor(Math.random() * compactListShouldBuy.length)] : _.minBy(compactListShouldBuy, 'percentage'); // TODO: change this
+      } = _.minBy(compactListShouldBuy, 'percentage');
       const historyOrder = await exchange.fetchMyTrades(pair);
       const isLastSell = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'sell';
 
@@ -348,10 +342,6 @@ async function start(data) {
 
         rate2Buy = method === 'Dip' ? baseRate * 0.985 : bid * 0.99;
         if (rate2Buy > bid) {
-          rate2Buy = bid;
-        }
-
-        if (telegramUserId === '778858976' || telegramUserId === 778858976) { // TODO: Delete in the next version
           rate2Buy = bid;
         }
 

@@ -1,6 +1,6 @@
 {
   "name": "ultimate-bot",
-  "version": "4.1.98",
+  "version": "4.2.0",
   "main": "app.js",
   "license": "MIT",
   "description": "Ultimate bot",
@@ -13,7 +13,7 @@
     "auto-reload-json": "^1.0.2",
     "axios": "^0.19.0",
     "bottleneck": "^2.19.5",
-    "ccxt": "^1.18.1039",
+    "ccxt": "^1.18.1042",
     "express": "^4.17.1",
     "fs-extra": "^8.1.0",
     "lodash": "^4.17.15",
