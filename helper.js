@@ -498,7 +498,7 @@ async function commonIndicator(exchange, highs, lows, closes, vols, last, pair) 
   const lastRSI = _.last(RSIVal);
   const lastEMA = _.last(EMAVal);
   const changeBB = lastBB.upper / lastBB.lower;
-  const baseRate = lastBB.lower * 0.995;
+  const baseRate = lastBB.lower * 0.99;
 
   const minRate = _.min(closes);
   const spikyVal = last / minRate;
