@@ -1,0 +1,4 @@
+Warning: Binance will perform a scheduled system upgrade starting at 2019/08/15 02:00 AM (UTC). The upgrade will take approximately 6-8 hours.
+https://www.binance.com/en/support/articles/360032315391
+
+This might cause the bot to hang, so please wait until the upgrade is completed

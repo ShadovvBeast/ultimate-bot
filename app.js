@@ -83,7 +83,7 @@ if (cluster.isMaster) {
     apiKey: settings.current.apiKey,
     secret: settings.current.secret,
     password: settings.current.password,
-    options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+    options: { adjustForTimeDifference: true, recvWindow: 10000, warnOnFetchOpenOrdersWithoutSymbol: false },
   });
 
   // Auto trigger
@@ -277,7 +277,7 @@ if (cluster.isMaster) {
           apiKey,
           secret,
           password,
-          options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+          options: { adjustForTimeDifference: true, recvWindow: 10000, warnOnFetchOpenOrdersWithoutSymbol: false },
         });
 
         await fs.writeJSON('setting.json', { ...settings, current: currentAccount });
@@ -302,7 +302,7 @@ if (cluster.isMaster) {
           apiKey,
           secret,
           password,
-          options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+          options: { adjustForTimeDifference: true, recvWindow: 10000, warnOnFetchOpenOrdersWithoutSymbol: false },
         });
 
         const clonedList = _.cloneDeep(settings.list);
