@@ -283,6 +283,24 @@ $(document).ready(() => {
 
   $('#pair').on('change', function () {
     selectedCoin = $(this).val();
+    // eslint-disable-next-line no-new
+    new TradingView.widget(
+      {
+        width: 980,
+        height: 610,
+        symbol: `${$('#exchangeID').val().toUpperCase()}:${selectedCoin.replace('/', '')}`,
+        interval: '30',
+        timezone: 'Etc/UTC',
+        theme: 'Dark',
+        style: '1',
+        locale: 'en',
+        toolbar_bg: '#f1f3f6',
+        enable_publishing: false,
+        hide_legend: true,
+        allow_symbol_change: true,
+        container_id: 'trading-view-chart',
+      },
+    );
     $('#rate-buy').val('');
     $('#rate-sell').val('');
     $('#amount-buy').val('');

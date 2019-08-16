@@ -83,14 +83,13 @@ if (cluster.isMaster) {
     apiKey: settings.current.apiKey,
     secret: settings.current.secret,
     password: settings.current.password,
-    options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+    options: { adjustForTimeDifference: true, recvWindow: 10000, warnOnFetchOpenOrdersWithoutSymbol: false },
   });
 
   // Auto trigger
-  const checkLastStatesExists = fs.existsSync('last-states.json') && global.messages.length === 0 && !global.isRunning;
-  let lastStates;
-  if (checkLastStatesExists) {
-    lastStates = fs.readJSONSync('last-states.json');
+  const checkLastStatesExists = () => fs.existsSync('last-states.json');
+  if (checkLastStatesExists()) {
+    const lastStates = fs.readJSONSync('last-states.json');
     startStrategy({
       exchange, io, telegramUserId: settings.current.telegramUserId, ...lastStates,
     });
@@ -100,7 +99,8 @@ if (cluster.isMaster) {
     // Reload previous messages, states
     global.messages.slice(Math.max(global.messages.length - 20, 0)).map(({ triggerType, mess }) => io.emit(triggerType, mess));
     io.emit('isRunning', global.isRunning);
-    if (lastStates) {
+    if (checkLastStatesExists()) {
+      const lastStates = await fs.readJSON('last-states.json');
       io.emit('lastStates', lastStates);
     }
     // Reload previous messages, states
@@ -277,7 +277,7 @@ if (cluster.isMaster) {
           apiKey,
           secret,
           password,
-          options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+          options: { adjustForTimeDifference: true, recvWindow: 10000, warnOnFetchOpenOrdersWithoutSymbol: false },
         });
 
         await fs.writeJSON('setting.json', { ...settings, current: currentAccount });
@@ -302,7 +302,7 @@ if (cluster.isMaster) {
           apiKey,
           secret,
           password,
-          options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+          options: { adjustForTimeDifference: true, recvWindow: 10000, warnOnFetchOpenOrdersWithoutSymbol: false },
         });
 
         const clonedList = _.cloneDeep(settings.list);
