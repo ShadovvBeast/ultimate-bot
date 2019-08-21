@@ -1,4 +1,4 @@
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const axios = require('axios');
 const AdmZip = require('adm-zip');
 const fs = require('fs-extra');
@@ -18,10 +18,11 @@ module.exports = async (url) => {
       console.error(stderr);
     };
     if (version !== remoteVersion) {
-      exec('git fetch upstream', execCallback);
-      exec('git checkout master', execCallback);
-      exec('git merge upstream/master', execCallback);
-      exec('git push', execCallback);
+      execSync('git fetch upstream', execCallback);
+      execSync('git checkout master', execCallback);
+      execSync('git merge upstream/master', execCallback);
+      execSync('git commit -m "Automatic update merge"', execCallback);
+      execSync('git push', execCallback);
 
       const dependenciesKey = Object.keys(dependencies);
       const remoteDependenciesKey = Object.keys(remoteDependencies);
