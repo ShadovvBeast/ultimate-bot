@@ -91,7 +91,7 @@ if (cluster.isMaster) {
   if (checkLastStatesExists()) {
     const lastStates = fs.readJSONSync('last-states.json');
     startStrategy({
-      exchange, io, telegramUserId: settings.current.telegramUserId, ...lastStates,
+      exchange, io, ...settings.general, ...lastStates,
     });
   }
 

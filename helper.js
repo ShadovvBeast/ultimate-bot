@@ -121,8 +121,8 @@ async function checkBuy(exchange, timeOrder, id, pair, telegram, telegramUserId,
           await exchange.cancelOrder(id, pair);
 
           const mess = loggingMessage(`Cancel the order: ${pair} due to exceed ${timeOrder} mins`);
+          ioEmitter(io, 'general', mess);
 
-          console.log(mess);
           telegram.sendMessage(telegramUserId, mess);
 
           resolve(filled);
@@ -286,7 +286,7 @@ async function calculateAmount2Sell(exchange, pair, orgAmount) {
   return enhancedAmount;
 }
 
-function isAmountOk(pair, amount, rate, telegram, telegramUserId) {
+function isAmountOk(pair, amount, rate, telegram, telegramUserId, io) {
   let checkAmount = true;
   const re = /\w+$/;
   const [marketPlace] = pair.match(re);
@@ -303,6 +303,7 @@ function isAmountOk(pair, amount, rate, telegram, telegramUserId) {
 
   if (!checkAmount && amount !== 0) {
     const mess = loggingMessage(`The order ${pair} is invalid due to too small, please consider to manually buy/sell it`);
+    ioEmitter(io, 'error', mess);
     telegram.sendMessage(telegramUserId, mess);
   }
 

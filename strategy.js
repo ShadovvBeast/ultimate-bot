@@ -63,7 +63,7 @@ async function start(data) {
     const checkMarketPlace = new RegExp(`${enhancedMarketPlace}$`, 'g');
 
     const ultimateExchange = new ccxt.binance({
-      options: { adjustForTimeDifference: true, recvWindow: 10000000, warnOnFetchOpenOrdersWithoutSymbol: false },
+      options: { adjustForTimeDifference: true, recvWindow: 10000, warnOnFetchOpenOrdersWithoutSymbol: false },
     });
     const ultimateMarkets = await ultimateExchange.fetchMarkets();
     const ultimateFilterMarkets = ultimateMarkets.filter(o => o.active === true && o.quote === enhancedMarketPlace);
@@ -92,7 +92,7 @@ async function start(data) {
 
           const rate2Sell = price * takeProfit;
           const amount2Sell = await calculateAmount2Sell(exchange, pair, filled);
-          const checkAmount = isAmountOk(pair, amount2Sell, rate2Sell, telegram, telegramUserId);
+          const checkAmount = isAmountOk(pair, amount2Sell, rate2Sell, telegram, telegramUserId, io);
 
           if (filled > 0 && checkAmount) {
             const sellRef = await exchange.createLimitSellOrder(symbol, amount2Sell.toFixedNumber(precision.amount).noExponents(), rate2Sell.toFixedNumber(precision.price).noExponents());
@@ -358,7 +358,7 @@ async function start(data) {
         if (buyFilled > 0) {
           const amount2Sell = await calculateAmount2Sell(exchange, pair, buyFilled);
           const rate2Sell = rate2Buy * takeProfit;
-          const checkAmount = isAmountOk(pair, amount2Sell, rate2Sell, telegram, telegramUserId);
+          const checkAmount = isAmountOk(pair, amount2Sell, rate2Sell, telegram, telegramUserId, io);
 
           if (checkAmount) {
             const sellRef = await exchange.createLimitSellOrder(pair, amount2Sell.toFixedNumber(amount).noExponents(), rate2Sell.toFixedNumber(price).noExponents());
@@ -428,7 +428,7 @@ async function start(data) {
             } catch (error) {
               waitSell.push({ id, pair });
               resolve(false);
-              console.log(e.message, 'It could be due to internet connection problems, re-checking the order...');
+              console.log(error.message, 'It could be due to internet connection problems, re-checking the order...');
             }
           })));
 
@@ -439,7 +439,7 @@ async function start(data) {
               const { bid } = await exchange.fetchTicker(pair);
               const rate2StopLoss = bid * 0.99;
               const remain = await calculateAmount2Sell(exchange, pair, amount - filled);
-              const checkAmount = isAmountOk(pair, remain, rate2StopLoss, telegram, telegramUserId);
+              const checkAmount = isAmountOk(pair, remain, rate2StopLoss, telegram, telegramUserId, io);
 
               if (checkAmount) {
                 const stopLossRef = await exchange.createLimitSellOrder(pair, remain.toFixedNumber(precision.amount).noExponents(), rate2StopLoss.toFixedNumber(precision.price).noExponents());
@@ -478,7 +478,7 @@ async function start(data) {
         global.shouldStop = false;
         global.isRunning = false;
         io.emit('isRunning', global.isRunning);
-        ioEmitter(io, 'general:stopBot', loggingMessage('Fully stopped the bot'));
+        ioEmitter(io, 'stopBot', loggingMessage('Fully stopped the bot'));
       }
     } catch (error) {
       restart(start, error, data);
