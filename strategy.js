@@ -460,10 +460,7 @@ async function start(data) {
         }
 
         if (!e.message.includes('429') && !e.message.toLowerCase().includes('ddos')) {
-          const shouldNormalReset = await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
-          if (shouldNormalReset) {
-            restart(start, e, data);
-          }
+          await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
         } else {
           if (delay < 1000) {
             delay += baseDelay;

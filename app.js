@@ -22,6 +22,7 @@ const {
   loggingMessage, calculateMinAmount, fetchMarket, fetchInfoPair, fetchActiveOrder, calculateAmount2Sell, ioEmitter,
 } = require('./helper');
 const { startStrategy, stopStrategy, setTelegram } = require('./strategy');
+const autoUpdater = require('./autoUpdater');
 
 if (cluster.isMaster) {
   cluster.fork();
@@ -55,6 +56,7 @@ if (cluster.isMaster) {
   });
 
   http.listen(port, async () => {
+    await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
     const endPoint = `http://localhost:${port}`;
     console.log(`Server is up on ${endPoint}`);
     process.send({ endPoint });
