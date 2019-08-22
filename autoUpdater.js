@@ -43,7 +43,6 @@ module.exports = async (url) => {
           });
         }
 
-        process.send({ isUpdate: true });
         process.exit(0);
         return false;
       });
