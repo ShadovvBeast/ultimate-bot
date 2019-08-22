@@ -236,7 +236,6 @@ $(document).ready(() => {
   // Loading active and history orders
   $('#orders').click(() => {
     socket.emit('fetch:order');
-    socket.emit('fetch:history');
   });
 
   let orderTable = '';

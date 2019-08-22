@@ -247,7 +247,7 @@ async function start(data) {
           resolve(null);
         }
       } catch (e) {
-        if (e.message.includes('429')) {
+        if (e.message.includes('429') || e.message.toLowerCase().includes('ddos')) {
           lastScannedSymbol = symbol;
           shouldSkipAllSymbols = true;
           shouldEnableCounterDDOS = true;
@@ -459,7 +459,7 @@ async function start(data) {
           await fs.writeJSON('./trade.json', { dangling, bought: newBought });
         }
 
-        if (!e.message.includes('429')) {
+        if (!e.message.includes('429') && !e.message.toLowerCase().includes('ddos')) {
           const shouldNormalReset = await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
           if (shouldNormalReset) {
             restart(start, e, data);

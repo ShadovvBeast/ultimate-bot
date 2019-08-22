@@ -127,6 +127,9 @@ async function checkBuy(exchange, timeOrder, id, pair, telegram, telegramUserId,
 
           resolve(filled);
           clearInterval(checkBuyInterval);
+        } else if (status === 'canceled') {
+          resolve(filled);
+          clearInterval(checkBuyInterval);
         }
       } catch (e) {
         console.log(e.message, 'It could be due to internet connection problems, re-checking the order...');
@@ -160,7 +163,7 @@ function checkBalance(marketName, marketBalance) {
 }
 
 function restart(start, e, data) {
-  if (e.message.includes('429')) {
+  if (e.message.includes('429') || e.message.toLowerCase().includes('ddos')) {
     setTimeout(() => {
       start.call(this, data);
     }, 90000);
