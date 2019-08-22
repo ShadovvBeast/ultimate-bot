@@ -82,7 +82,7 @@ if (cluster.isMaster) {
   if (checkLastStatesExists()) {
     const lastStates = fs.readJSONSync('last-states.json');
     startStrategy({
-      exchange, io, ...settings.general, ...lastStates,
+      exchange, io, ...settings.current, ...lastStates,
     });
   }
 
@@ -134,7 +134,7 @@ if (cluster.isMaster) {
     socket.on('main-start', async (data) => {
       ioEmitter(io, 'general', loggingMessage('Starting the bot'));
       startStrategy({
-        exchange, io, telegramUserId: settings.current.telegramUserId, ...data,
+        exchange, io, ...settings.current, ...data,
       });
 
       await fs.writeJSON('last-states.json', data);

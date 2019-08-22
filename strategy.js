@@ -31,7 +31,7 @@ const {
   loggingMessage, ioEmitter, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, calculateAmount2Sell, commonIndicator, upTrend, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
 } = require('./helper');
 const messenger = require('./messenger');
-const { general: { telegramToken }, current } = require('./setting.json');
+const { general: { telegramToken } } = require('./setting.json');
 
 let delay = 0;
 let lastScannedSymbol;
@@ -488,7 +488,7 @@ async function start(data) {
 
 function startStrategy(data) {
   const {
-    takeProfitPct, stopLossPct, marketPlace, stableMarket,
+    telegramUserId, takeProfitPct, stopLossPct, marketPlace, stableMarket,
   } = data;
   const enhancedMarketPlace = marketPlace.toUpperCase();
   const enhancedStableMarket = stableMarket.toUpperCase();
@@ -496,7 +496,7 @@ function startStrategy(data) {
   const takeProfit = (100 + takeProfitPct) / 100;
   const stopLoss = (100 - stopLossPct) / 100;
 
-  messenger(telegram, current.telegramUserId);
+  messenger(telegram, telegramUserId);
   start({
     ...data, takeProfit, stopLoss, enhancedMarketPlace, enhancedStableMarket,
   });
