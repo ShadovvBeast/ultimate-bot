@@ -27,19 +27,10 @@ if (cluster.isMaster) {
   cluster.fork();
 
   let shouldOpenWebServer = true;
-  cluster.workers[1].on('message', async ({ endPoint, isUpdate }) => {
+  cluster.on('message', async (worker, { endPoint }) => {
     if (shouldOpenWebServer && endPoint) {
       await open(endPoint);
       shouldOpenWebServer = false;
-    }
-
-    if (isUpdate) {
-      const { general: { telegramToken }, current: { telegramUserId } } = await fs.readJSON('./setting.json');
-      if (telegramUserId !== '') {
-        console.log('New files are applied. Resetting...');
-        const telegram = new TelegramBot(telegramToken);
-        telegram.sendMessage(telegramUserId, 'An update is available. New files are applied.');
-      }
     }
   });
 
@@ -91,7 +82,7 @@ if (cluster.isMaster) {
   if (checkLastStatesExists()) {
     const lastStates = fs.readJSONSync('last-states.json');
     startStrategy({
-      exchange, io, telegramUserId: settings.current.telegramUserId, ...lastStates,
+      exchange, io, ...settings.general, ...lastStates,
     });
   }
 

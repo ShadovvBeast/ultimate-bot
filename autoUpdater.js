@@ -23,13 +23,22 @@ module.exports = async (url) => {
       execSync('git merge upstream/master -s recursive -Xtheirs', execCallback);
       execSync('git push', execCallback);
 
-      const dependenciesKey = Object.keys(dependencies);
-      const remoteDependenciesKey = Object.keys(remoteDependencies);
-      if (dependenciesKey.length !== remoteDependenciesKey.length) 
-          exec('npm install', execCallback);
-      process.send({ isUpdate: true });
-      process.exit(0);
-      return false;
+        const dependenciesKey = Object.keys(dependencies);
+        const remoteDependenciesKey = Object.keys(remoteDependencies);
+        if (dependenciesKey.length !== remoteDependenciesKey.length) {
+          exec('npm install', (e, stdout, stderr) => {
+            if (e instanceof Error) {
+              console.error(e);
+              throw e;
+            }
+            console.log(stdout);
+            console.error(stderr);
+          });
+        }
+
+        process.exit(0);
+        return false;
+      });
     } else {
       console.log('The software is up to date');
       return true;

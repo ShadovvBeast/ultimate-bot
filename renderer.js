@@ -45,6 +45,8 @@ $.fn.toggleClick = function () {
 $(document).ready(() => {
   // Home page
   // Init
+
+  // Reload previous states
   const marketPlaceRef = $('#main-market-place');
   const useFundPercentageRef = $('#main-amount-percentage');
   const takeProfitPctRef = $('#main-take-profit');
@@ -56,7 +58,6 @@ $(document).ready(() => {
   const timeFrameStableMarketRef = $('#main-time-frame-stable-market');
   const mainListRef = [marketPlaceRef, useFundPercentageRef, takeProfitPctRef, stopLossPctRef, useStableMarketRef, stableMarketRef, timeOrderRef, timeFrameRef, timeFrameStableMarketRef];
 
-  // Reload previous states
   socket.on('isRunning', (isRunning) => {
     if (isRunning) {
       toggleClickIndex = 1;
@@ -68,7 +69,9 @@ $(document).ready(() => {
   });
   socket.on('lastStates', (lastStates) => {
     Object.keys(lastStates).map((key, index) => {
-      mainListRef[index].val(lastStates[key].toString());
+      if (typeof lastStates[key] !== 'object') {
+        mainListRef[index].val(lastStates[key].toString());
+      }
     });
   });
   // Reload previous states
@@ -162,15 +165,6 @@ $(document).ready(() => {
     $('#main-start').html('<i class="tim-icons icon-triangle-right-17"></i>Start').attr('disabled', true);
   });
 
-  // Enable the button when it fully stopped
-  socket.on('general:stopBot', (msg) => {
-    $('#trigger')
-      .prepend(`<div class="alert alert-danger">
-        <span>${msg}</span>
-      </div>`);
-    $('#main-start').attr('disabled', false);
-  });
-
   // Live trigger info
 
   function removeTriggerListOverLoad() {
@@ -220,11 +214,28 @@ $(document).ready(() => {
     removeTriggerListOverLoad();
   });
 
+  // Error
+  socket.on('error', (msg) => {
+    $('#trigger')
+      .prepend(`<div class="alert alert-danger">
+          <span>${msg}</span>
+      </div>`);
+    removeTriggerListOverLoad();
+  });
+
+  // Enable the button when it fully stopped
+  socket.on('stopBot', (msg) => {
+    $('#trigger')
+      .prepend(`<div class="alert alert-danger">
+          <span>${msg}</span>
+        </div>`);
+    $('#main-start').attr('disabled', false);
+  });
+
   // Order page
   // Loading active and history orders
   $('#orders').click(() => {
     socket.emit('fetch:order');
-    socket.emit('fetch:history');
   });
 
   let orderTable = '';
