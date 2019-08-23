@@ -461,6 +461,7 @@ async function start(data) {
 
         if (!e.message.includes('429') && !e.message.toLowerCase().includes('ddos')) {
           await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
+          restart(start, e, data);
         } else {
           if (delay < 1000) {
             delay += baseDelay;
