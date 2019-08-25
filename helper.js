@@ -132,7 +132,7 @@ async function checkBuy(exchange, timeOrder, id, pair, telegram, telegramUserId,
           clearInterval(checkBuyInterval);
         }
       } catch (e) {
-        console.log(e.message, 'It could be due to internet connection problems, re-checking the order...');
+        console.log(e.message);
       }
     }, 300000);
   });
