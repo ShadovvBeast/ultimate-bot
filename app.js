@@ -4,13 +4,11 @@ process.on('unhandledRejection', (reason, p) => {
 process.env.NTBA_FIX_319 = 1;
 
 const fs = require('fs-extra');
-const TelegramBot = require('node-telegram-bot-api');
 const cluster = require('cluster');
 const ccxt = require('ccxt');
 const express = require('express');
 const autoReloadJson = require('auto-reload-json');
 const _ = require('lodash');
-const open = require('open');
 
 // Express server
 const app = express();
@@ -26,14 +24,6 @@ const autoUpdater = require('./autoUpdater');
 
 if (cluster.isMaster) {
   cluster.fork();
-
-  let shouldOpenWebServer = true;
-  cluster.on('message', async (worker, { endPoint }) => {
-    if (shouldOpenWebServer && endPoint) {
-      await open(endPoint);
-      shouldOpenWebServer = false;
-    }
-  });
 
   cluster.on('exit', async () => {
     cluster.fork();
@@ -58,8 +48,7 @@ if (cluster.isMaster) {
   http.listen(port, async () => {
     await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
     const endPoint = `http://localhost:${port}`;
-    console.log(`Server is up on ${endPoint}`);
-    process.send({ endPoint });
+    console.log(`Server is up on ${endPoint}, please use your browser and go to the link`);
   });
   // Express server
 
