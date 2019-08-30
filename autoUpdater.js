@@ -20,7 +20,7 @@ module.exports = async (url) => {
     if (version !== remoteVersion) {
       execSync('git fetch upstream', execCallback);
       execSync('git checkout master', execCallback);
-      execSync('git merge upstream/master -s recursive -Xtheirs', execCallback);
+      execSync('git merge upstream/master -s recursive -X theirs', execCallback);
       execSync('git push', execCallback);
 
         const dependenciesKey = Object.keys(dependencies);
