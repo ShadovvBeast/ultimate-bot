@@ -109,9 +109,22 @@ async function start(data) {
         }
       }))));
     }
-
+    const log_balance = (balance) => {
+      const file_name = 'balance_history.json';
+      fs.readFile(file_name, (err, data) => {
+          const interesting_balance = {[enhancedMarketPlace]: balance.free[enhancedMarketPlace], [enhancedStableMarket]: balance.free[enhancedStableMarket]};
+          const new_val = [Date.now(), interesting_balance];
+          let balance_arr = err ? false : data && JSON.parse(data);
+          if (!balance_arr || JSON.stringify(balance_arr[0][1]) != JSON.stringify(interesting_balance))
+          {
+            balance_arr ? balance_arr.unshift(new_val) : (balance_arr = [new_val]);
+            fs.appendFile(file_name, JSON.stringify(balance_arr));
+          }
+        });
+      
+    }
     const accountBalance = await exchange.fetchBalance();
-
+    log_balance(accountBalance);
     const marketPlaceBalance = !_.isUndefined(accountBalance.free[enhancedMarketPlace]) ? accountBalance.free[enhancedMarketPlace] * (useFundPercentage / 100) : 0;
     const stableCoinBalance = !_.isUndefined(accountBalance.free[enhancedStableMarket]) ? accountBalance.free[enhancedStableMarket] : 0;
 
