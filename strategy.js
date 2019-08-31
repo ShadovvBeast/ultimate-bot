@@ -118,7 +118,7 @@ async function start(data) {
           if (!balance_arr || JSON.stringify(balance_arr[0][1]) != JSON.stringify(interesting_balance))
           {
             balance_arr ? balance_arr.unshift(new_val) : (balance_arr = [new_val]);
-            fs.appendFile(file_name, JSON.stringify(balance_arr));
+            fs.writeFile(file_name, JSON.stringify(balance_arr));
           }
         });
       
