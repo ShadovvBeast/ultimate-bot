@@ -40,11 +40,14 @@ module.exports = async (url) => {
             }
             console.log(stdout);
             console.error(stderr);
-          });
-        }
 
-        process.exit(0);
-        return false;
+            process.exit(0);
+            return false;
+          });
+        } else {
+          process.exit(0);
+          return false;
+        }
       });
     } else {
       console.log('The software is up to date');
