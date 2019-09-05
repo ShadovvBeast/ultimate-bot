@@ -9,6 +9,15 @@ const ccxt = require('ccxt');
 const express = require('express');
 const autoReloadJson = require('auto-reload-json');
 const _ = require('lodash');
+const passport = require('passport');
+const compression = require('compression');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
+const cookieSession = require('cookie-session');
+const CookieStrategy = require('passport-cookie');
+const randomWords = require('random-words');
+const utils = require('utility');
 
 // Express server
 const app = express();
@@ -17,7 +26,7 @@ const io = require('socket.io')(http);
 // Express server
 
 const {
-  loggingMessage, calculateMinAmount, fetchMarket, fetchInfoPair, fetchActiveOrder, calculateAmount2Sell, ioEmitter,
+  checkToken, loggingMessage, calculateMinAmount, fetchMarket, fetchInfoPair, fetchActiveOrder, calculateAmount2Sell, ioEmitter,
 } = require('./helper');
 const { startStrategy, stopStrategy, setTelegram } = require('./strategy');
 const autoUpdater = require('./autoUpdater');
@@ -32,10 +41,48 @@ if (cluster.isMaster) {
   // Express server
   const port = process.env.PORT || 3000;
 
-  app.use(express.static(__dirname));
+  const unless = function (path, middleware) {
+    return function (req, res, next) {
+      if (path === req.path) {
+        return next();
+      }
+      return middleware(req, res, next);
+    };
+  };
+
+  app.use(compression({ level: 9 }));
+  app.use(cors());
+  app.use(bodyParser.json());
+  app.use(bodyParser.urlencoded({ extended: false }));
+  app.use(cookieParser());
+  app.use(cookieSession({
+    keys: ['60afd6132e10fb5da383ac97a29ba7dd67c07dacd17d23bcf8697591742cf32d'],
+    maxAge: 24 * 60 * 60 * 1000 * 7, // 7 days
+  }));
+  app.use(passport.initialize());
+  app.use(passport.session());
+  app.use(unless('/authenticate', passport.authenticate('cookie', { failureRedirect: '/authenticate' })));
+  app.use(express.static('public'));
+
+  // Passport
+  passport.serializeUser((token, done) => done(null, token));
+  passport.deserializeUser(async (currentToken, done) => {
+    await checkToken(currentToken, done);
+  });
+
+  passport.use(new CookieStrategy(
+    (async (currentToken, done) => {
+      await checkToken(currentToken, done);
+    }),
+  ));
+  // Passport
 
   app.get('/', (req, res) => {
-    res.sendFile(`${__dirname}/index.html`);
+    res.sendFile(`${__dirname}/public/home.html`);
+  });
+
+  app.get('/authenticate', async (req, res) => {
+    res.sendFile(`${__dirname}/public/auth.html`);
   });
 
   io.on('connection', (socket) => {
@@ -86,6 +133,35 @@ if (cluster.isMaster) {
       io.emit('lastStates', lastStates);
     }
     // Reload previous messages, states
+
+    // Passport
+    const isTokenExisted = fs.existsSync('./token.json');
+    if (!isTokenExisted) {
+      io.emit('generateToken', utils.sha256(Buffer.from(randomWords())));
+    }
+
+    socket.on('generateToken', () => {
+      io.emit('generateToken', utils.sha256(Buffer.from(randomWords())));
+    });
+    socket.on('verifyToken', async (currentToken) => {
+      if (!isTokenExisted) {
+        io.emit('verifyToken', true);
+        await fs.writeJSON('./token.json', { token: currentToken });
+
+        return true;
+      }
+
+      const { token } = await fs.readJSON('./token.json');
+
+      if (currentToken.toString() === token.toString()) {
+        io.emit('verifyToken', true);
+        return true;
+      }
+
+      io.emit('verifyToken', false);
+      return false;
+    });
+    // Passport
 
     // Fetch Market
     socket.on('fetch:market', async () => {
