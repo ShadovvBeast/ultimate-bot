@@ -9,6 +9,19 @@ function loggingMessage(msg) {
   return `[${moment().format('HH:mm:ss DD/MM/YYYY')}] - ${msg}`;
 }
 
+async function checkToken(currentToken, done) {
+  const isTokenExisted = fs.existsSync('./token.json');
+  if (!isTokenExisted) {
+    return done(null, false);
+  }
+  const { token } = await fs.readJSON('./token.json');
+
+  if (currentToken.toString() === token.toString()) {
+    return done(null, token);
+  }
+  return done(null, false);
+}
+
 function ioEmitter(io, triggerType, mess) {
   console.log(mess);
   io.emit(triggerType, mess);
@@ -529,5 +542,5 @@ async function commonIndicator(exchange, highs, lows, closes, vols, last, pair) 
 }
 
 module.exports = {
-  loggingMessage, ioEmitter, fetchInfoPair, fetchMarket, fetchActiveOrder, calculateMinAmount, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, commonIndicator, upTrend, calculateAmount2Sell, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
+  checkToken, loggingMessage, ioEmitter, fetchInfoPair, fetchMarket, fetchActiveOrder, calculateMinAmount, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, commonIndicator, upTrend, calculateAmount2Sell, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
 };
