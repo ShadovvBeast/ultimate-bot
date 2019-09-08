@@ -191,7 +191,6 @@ function restart(start, e, data) {
 
 function messageTrade(ref, side, amount, pair, rate, telegram, telegramUserId, io, triggerType) {
   const mess = loggingMessage(`${side}: ${amount} ${pair} at rate = ${rate}`);
-  console.log(mess);
   console.log(ref);
   ioEmitter(io, triggerType, mess);
   telegram.sendMessage(telegramUserId, mess);

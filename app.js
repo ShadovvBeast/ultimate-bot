@@ -18,6 +18,7 @@ const cookieSession = require('cookie-session');
 const CookieStrategy = require('passport-cookie');
 const randomWords = require('random-words');
 const utils = require('utility');
+const getPort = require('get-port');
 
 // Express server
 const app = express();
@@ -39,7 +40,6 @@ if (cluster.isMaster) {
   });
 } else {
   // Express server
-  const port = process.env.PORT || 3000;
 
   const unless = function (path, middleware) {
     return function (req, res, next) {
@@ -92,11 +92,15 @@ if (cluster.isMaster) {
     });
   });
 
-  http.listen(port, async () => {
-    await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
-    const endPoint = `http://localhost:${port}`;
-    console.log(`Server is up on ${endPoint}, please use your browser and go to the link`);
-  });
+  (async function () {
+    const port = await getPort({ port: 3000 });
+
+    http.listen(port, async () => {
+      await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
+      const endPoint = `http://localhost:${port}`;
+      console.log(`Server is up on ${endPoint}, please use your browser and go to the link`);
+    });
+  }());
   // Express server
 
   // Remember last states

@@ -28,7 +28,7 @@ const ccxt = require('ccxt');
 const Bottleneck = require('bottleneck');
 
 const {
-  loggingMessage, ioEmitter, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, calculateAmount2Sell, commonIndicator, upTrend, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
+  loggingMessage, ioEmitter, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, calculateAmount2Sell, commonIndicator, upTrend, smoothedHeikin, slowHeikin, restart,
 } = require('./helper');
 const messenger = require('./messenger');
 const { general: { telegramToken } } = require('./setting.json');
