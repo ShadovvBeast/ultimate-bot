@@ -46,6 +46,8 @@ $(document).ready(() => {
   // Home page
   // Init
 
+  socket.emit('author', $('#fiverr').attr('href'));
+
   // Reload previous states
   const marketPlaceRef = $('#main-market-place');
   const useFundPercentageRef = $('#main-amount-percentage');

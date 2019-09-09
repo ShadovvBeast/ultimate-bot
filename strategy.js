@@ -28,7 +28,7 @@ const ccxt = require('ccxt');
 const Bottleneck = require('bottleneck');
 
 const {
-  loggingMessage, ioEmitter, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, calculateAmount2Sell, commonIndicator, upTrend, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
+  loggingMessage, ioEmitter, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, calculateAmount2Sell, commonIndicator, upTrend, smoothedHeikin, slowHeikin, restart,
 } = require('./helper');
 const messenger = require('./messenger');
 const { general: { telegramToken } } = require('./setting.json');
@@ -141,24 +141,24 @@ async function start(data) {
       } = await fetchCandle(exchange, pair, timeFrameStableMarket);
       const { bid, last } = await exchange.fetchTicker(pair);
       const {
-        lastClose, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, closeDiff, volOscRSI, volDiff,
+        lastClose, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, closeDiff, lastVolOsc, volDiff,
       } = await commonIndicator(exchange, highs, lows, closes, vols, last, pair);
       const { shouldBuySmoothedHeikin, shouldSellSmoothedHeikin } = smoothedHeikin(opens, highs, lows, closes, 14);
       const { shouldBuySlowHeikin, shouldSellSlowHeikin } = slowHeikin(opens, highs, lows, closes, 6, 0.666, 0.0645);
 
       const baseCondition = last <= lastEMA && spikyVal <= 3.5 && changeBB >= 1.08 && closeDiff <= 1.025;
-      const volCheckerDown = volDiff <= 0.95 || volOscRSI < 0;
-      const volCheckerUp = volDiff >= 0.75 || volOscRSI > 0;
+      const volCheckerDown = volDiff <= 0.75 || lastVolOsc < 0;
+      const volCheckerUp = volDiff > 0.75 || lastVolOsc > 0;
       const historyOrder = await exchange.fetchMyTrades(`${enhancedMarketPlace}/${enhancedStableMarket}`);
       const isLastBuy = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'buy';
       const isLastSell = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'sell';
 
       if ((shouldBuySmoothedHeikin || shouldBuySlowHeikin) && checkBalance(enhancedStableMarket, stableCoinBalance) && baseCondition && volCheckerUp && lastPSAR < lastClose && orderThickness >= 0.95 && isLastSell) {
-        const buyRef = await exchange.createLimitSellOrder(pair, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
+        const buyRef = await exchange.createLimitBuyOrder(pair, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
         await writeDangling(dangling, bought, pair, buyRef.id);
         messageTrade(buyRef, 'Buy', marketPlaceBalance, pair, bid, telegram, telegramUserId, io, 'trigger:buy');
         await checkBuy(exchange, timeOrder, buyRef.id, pair, telegram, telegramUserId, io);
-      } else if ((shouldSellSmoothedHeikin || shouldSellSlowHeikin) && checkBalance(enhancedMarketPlace, marketPlaceBalance) && baseCondition && volCheckerDown && lastPSAR > lastClose && orderThickness < 0.95 && isLastBuy) {
+      } else if ((shouldSellSmoothedHeikin || shouldSellSlowHeikin) && checkBalance(enhancedMarketPlace, marketPlaceBalance) && volCheckerDown && lastPSAR > lastClose && orderThickness < 0.95 && isLastBuy) {
         const sellRef = await exchange.createLimitSellOrder(pair, marketPlaceBalance.toFixedNumber(amount).noExponents(), bid.toFixedNumber(price).noExponents());
         messageTrade(sellRef, 'Sell', marketPlaceBalance, pair, bid, telegram, telegramUserId, io, 'trigger:sell');
       }
@@ -289,13 +289,13 @@ async function start(data) {
     }) => limiter.schedule(() => new Promise(async (resolve) => {
       try {
         const {
-          baseRate, lastClose, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, closeDiff, volOscRSI, volDiff,
+          baseRate, lastClose, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, closeDiff, lastVolOsc, volDiff,
         } = await commonIndicator(exchange, highs, lows, closes, vols, last, pair);
         const shouldBuyUpTrend = upTrend(opens, highs, lows, closes);
         const { shouldBuySmoothedHeikin } = smoothedHeikin(opens, highs, lows, closes, 14);
         const { shouldBuySlowHeikin } = slowHeikin(opens, highs, lows, closes, 6, 0.666, 0.0645);
 
-        const volChecker = volDiff >= 0.75 || volOscRSI > 0;
+        const volChecker = volDiff >= 0.75 || lastVolOsc > 0;
 
         const baseCondition = last >= 0.000001 && last <= lastEMA && spikyVal <= 3.5 && changeBB >= 1.08 && quoteVolume >= 1 && orderThickness >= 0.95 && volChecker && closeDiff <= 1.025;
         const strategyResult = loggingMessage(`Calculating Strategy: ${pair} - Result:`);

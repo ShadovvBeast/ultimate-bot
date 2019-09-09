@@ -191,7 +191,6 @@ function restart(start, e, data) {
 
 function messageTrade(ref, side, amount, pair, rate, telegram, telegramUserId, io, triggerType) {
   const mess = loggingMessage(`${side}: ${amount} ${pair} at rate = ${rate}`);
-  console.log(mess);
   console.log(ref);
   ioEmitter(io, triggerType, mess);
   telegram.sendMessage(telegramUserId, mess);
@@ -296,7 +295,7 @@ async function calculateAmount2Sell(exchange, pair, orgAmount) {
   if (isHasBNB !== -1) {
     const bnbFree = balance.free.BNB;
     if (bnbFree === 0) {
-      enhancedAmount = orgAmount > availableCoin ? availableCoin * 0.9975 : orgAmount * 0.9975;
+      enhancedAmount = orgAmount > availableCoin ? availableCoin : orgAmount;
     }
   }
   return enhancedAmount;
@@ -471,7 +470,7 @@ function slowHeikin(opens, highs, lows, closes, period, fastEnd, slowEnd) {
   };
 }
 
-function obvOscillatorRSI(closes, vols, period = 7) {
+function obvOscillator(closes, vols, period = 7) {
   const OBVVal = OBV.calculate({
     close: closes,
     volume: vols,
@@ -484,9 +483,7 @@ function obvOscillatorRSI(closes, vols, period = 7) {
 
   const OBVOscVal = smoothedOBVVal.map((value, index) => OBVVal[index + period - 1] - value);
 
-  const OBVOscRSIVal = RSI.calculate({ period, values: OBVOscVal });
-
-  return OBVOscRSIVal;
+  return OBVOscVal;
 }
 
 async function commonIndicator(exchange, highs, lows, closes, vols, last, pair) {
@@ -531,16 +528,16 @@ async function commonIndicator(exchange, highs, lows, closes, vols, last, pair) 
 
   const orderThickness = bids[limitBidOrderBook - 1][0] / bids[0][0];
 
-  const OBVOscRSIVal = obvOscillatorRSI(closes, vols, 7);
+  const OBVOscVal = obvOscillator(closes, vols, 7);
 
-  const volOscRSI = _.last(OBVOscRSIVal) - OBVOscRSIVal[OBVOscRSIVal.length - 2];
+  const lastVolOsc = _.last(OBVOscVal);
   const volDiff = bidVol / askVol;
 
   return {
-    baseRate, lastClose, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff, volOscRSI, volDiff,
+    baseRate, lastClose, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, bidVol, askVol, closeDiff, lastVolOsc, volDiff,
   };
 }
 
 module.exports = {
-  checkToken, loggingMessage, ioEmitter, fetchInfoPair, fetchMarket, fetchActiveOrder, calculateMinAmount, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, commonIndicator, upTrend, calculateAmount2Sell, smoothedHeikin, slowHeikin, obvOscillatorRSI, restart,
+  checkToken, loggingMessage, ioEmitter, fetchInfoPair, fetchMarket, fetchActiveOrder, calculateMinAmount, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, commonIndicator, upTrend, calculateAmount2Sell, smoothedHeikin, slowHeikin, restart,
 };

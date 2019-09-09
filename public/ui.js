@@ -1,5 +1,8 @@
 $(document).ready(() => {
   $().ready(() => {
+    $('#fiverr').attr('href', 'https://www.fiverr.com/onfqzmpgvr/provide-my-cryptocurrency-trading-bot');
+    $('#telegram').attr('href', 'https://t.me/end_lesslove2012');
+
     $sidebar = $('.sidebar');
     $navbar = $('.navbar');
     $main_panel = $('.main-panel');

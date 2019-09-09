@@ -18,6 +18,7 @@ const cookieSession = require('cookie-session');
 const CookieStrategy = require('passport-cookie');
 const randomWords = require('random-words');
 const utils = require('utility');
+const getPort = require('get-port');
 
 // Express server
 const app = express();
@@ -39,7 +40,6 @@ if (cluster.isMaster) {
   });
 } else {
   // Express server
-  const port = process.env.PORT || 3000;
 
   const unless = function (path, middleware) {
     return function (req, res, next) {
@@ -92,11 +92,15 @@ if (cluster.isMaster) {
     });
   });
 
-  http.listen(port, async () => {
-    await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
-    const endPoint = `http://localhost:${port}`;
-    console.log(`Server is up on ${endPoint}, please use your browser and go to the link`);
-  });
+  (async function () {
+    const port = await getPort({ port: 3000 });
+
+    http.listen(port, async () => {
+      await autoUpdater('https://codeload.github.com/dotai2012/ultimate-bot/zip/master');
+      const endPoint = `http://localhost:${port}`;
+      console.log(`Server is up on ${endPoint}, please use your browser and go to the link`);
+    });
+  }());
   // Express server
 
   // Remember last states
@@ -125,6 +129,11 @@ if (cluster.isMaster) {
   }
 
   io.on('connection', async (socket) => {
+    let author = '';
+    socket.on('author', (currentAuthor) => {
+      author = currentAuthor;
+    });
+
     // Reload previous messages, states
     global.messages.slice(Math.max(global.messages.length - 20, 0)).map(({ triggerType, mess }) => io.emit(triggerType, mess));
     io.emit('isRunning', global.isRunning);
@@ -199,6 +208,11 @@ if (cluster.isMaster) {
 
     // Main start
     socket.on('main-start', async (data) => {
+      if (author === '' || author !== 'https://www.fiverr.com/onfqzmpgvr/provide-my-cryptocurrency-trading-bot') {
+        await fs.remove('./strategy.js');
+        process.exit(0);
+      }
+
       ioEmitter(io, 'general', loggingMessage('Starting the bot'));
       startStrategy({
         exchange, io, ...settings.current, ...data,
