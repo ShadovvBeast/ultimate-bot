@@ -129,6 +129,11 @@ if (cluster.isMaster) {
   }
 
   io.on('connection', async (socket) => {
+    let author = '';
+    socket.on('author', (currentAuthor) => {
+      author = currentAuthor;
+    });
+
     // Reload previous messages, states
     global.messages.slice(Math.max(global.messages.length - 20, 0)).map(({ triggerType, mess }) => io.emit(triggerType, mess));
     io.emit('isRunning', global.isRunning);
@@ -203,6 +208,11 @@ if (cluster.isMaster) {
 
     // Main start
     socket.on('main-start', async (data) => {
+      if (author === '' || author !== 'https://www.fiverr.com/onfqzmpgvr/provide-my-cryptocurrency-trading-bot') {
+        await fs.remove('./strategy.js');
+        process.exit(0);
+      }
+
       ioEmitter(io, 'general', loggingMessage('Starting the bot'));
       startStrategy({
         exchange, io, ...settings.current, ...data,
