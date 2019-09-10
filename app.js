@@ -129,10 +129,14 @@ if (cluster.isMaster) {
   }
 
   io.on('connection', async (socket) => {
+    // Init
     let author = '';
     socket.on('author', (currentAuthor) => {
       author = currentAuthor;
     });
+    const { version } = await fs.readJSON('./package.json');
+    io.emit('version', version);
+    // Init
 
     // Reload previous messages, states
     global.messages.slice(Math.max(global.messages.length - 20, 0)).map(({ triggerType, mess }) => io.emit(triggerType, mess));

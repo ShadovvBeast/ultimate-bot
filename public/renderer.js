@@ -47,6 +47,7 @@ $(document).ready(() => {
   // Init
 
   socket.emit('author', $('#fiverr').attr('href'));
+  socket.once('version', (version) => { document.title = `${document.title} v${version}`; });
 
   // Reload previous states
   const marketPlaceRef = $('#main-market-place');
