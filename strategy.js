@@ -26,6 +26,7 @@ const _ = require('lodash');
 const moment = require('moment');
 const ccxt = require('ccxt');
 const Bottleneck = require('bottleneck');
+const weightedMean = require('weighted-mean');
 
 const {
   loggingMessage, ioEmitter, AsyncArray, isAmountOk, messageTrade, fetchCandle, writeDangling, writeBought, checkBuy, checkBalance, calculateAmount2Sell, commonIndicator, upTrend, smoothedHeikin, slowHeikin, restart,
@@ -33,7 +34,9 @@ const {
 const messenger = require('./messenger');
 const { general: { telegramToken } } = require('./setting.json');
 
+const weightStep = 0.0052083;
 let delay = 0;
+let weight = 1;
 let lastScannedSymbol;
 let shouldSkipAllSymbols = false;
 let shouldEnableCounterDDOS = false;
@@ -51,6 +54,10 @@ const limiter = new Bottleneck({
 const autoUpdater = require('./autoUpdater');
 
 let telegram = new TelegramBot(telegramToken);
+
+setInterval(() => {
+  weight -= weightStep;
+}, 1800000);
 
 async function start(data) {
   try {
@@ -278,31 +285,64 @@ async function start(data) {
         const {
           baseRate, lastClose, lastRSI, lastEMA, lastPSAR, spikyVal, changeBB, orderThickness, closeDiff, lastVolOsc, volDiff,
         } = await commonIndicator(exchange, highs, lows, closes, vols, last, pair);
-        const shouldBuyUpTrend = upTrend(opens, highs, lows, closes);
+        const upTrendBuyWeight = upTrend(opens, highs, lows, closes);
         const { shouldBuySmoothedHeikin } = smoothedHeikin(opens, highs, lows, closes, 14);
         const { shouldBuySlowHeikin } = slowHeikin(opens, highs, lows, closes, 6, 0.666, 0.0645);
 
         const volChecker = volDiff >= 0.75 || lastVolOsc > 0;
 
-        const baseCondition = last >= 0.000001 && last <= lastEMA && spikyVal <= 3.5 && changeBB >= 1.08 && quoteVolume >= 1 && orderThickness >= 0.95 && volChecker && closeDiff <= 1.025;
+        const meanBaseCondition = [
+          [+(last >= 0.000001), 6.25],
+          [+(last <= lastEMA), 6.25],
+          [+(spikyVal <= 3.5), 6.25],
+          [+(changeBB >= 1.08), 6.25],
+          [+(quoteVolume >= 1), 6.25],
+          [+(orderThickness >= 0.95), 6.25],
+          [+(volChecker), 6.25],
+          [+(closeDiff <= 1.025), 6.25],
+        ]; // 50 % weight
+
+        const dipWeight = weightedMean([
+          ...meanBaseCondition,
+          [+(last <= baseRate), 45],
+          [+(lastRSI <= 35), 5],
+        ]);
+
+        const smoothedHeikinWeight = weightedMean([
+          ...meanBaseCondition,
+          [+(shouldBuySmoothedHeikin), 40],
+          [+(lastPSAR < lastClose), 10],
+        ]);
+
+        const slowHeikinWeight = weightedMean([
+          ...meanBaseCondition,
+          [+(shouldBuySlowHeikin), 40],
+          [+(lastPSAR < lastClose), 10],
+        ]);
+
+        const topWeight = weightedMean([
+          ...meanBaseCondition,
+          ...upTrendBuyWeight,
+        ]);
+
         const strategyResult = loggingMessage(`Calculating Strategy: ${pair} - Result:`);
 
-        if (last <= baseRate && lastRSI <= 35 && baseCondition) {
+        if (dipWeight >= weight) {
           console.log(strategyResult, 'SUCCESS');
           resolve({
             pair, percentage, bid, baseRate, method: 'Dip',
           });
-        } else if (shouldBuySmoothedHeikin && lastPSAR < lastClose && baseCondition) {
+        } else if (smoothedHeikinWeight >= weight) {
           console.log(strategyResult, 'SUCCESS');
           resolve({
             pair, percentage, bid, baseRate, method: 'Smoothed Heikin',
           });
-        } else if (shouldBuySlowHeikin && lastPSAR < lastClose && baseCondition) {
+        } else if (slowHeikinWeight >= weight) {
           console.log(strategyResult, 'SUCCESS');
           resolve({
             pair, percentage, bid, baseRate, method: 'Slow Heikin',
           });
-        } else if (shouldBuyUpTrend && baseCondition) {
+        } else if (topWeight >= weight) {
           console.log(strategyResult, 'SUCCESS');
           resolve({
             pair, percentage, bid, baseRate, method: 'Top',
@@ -331,6 +371,7 @@ async function start(data) {
     }
 
     if (compactListShouldBuy.length > 0) {
+      weight = 1;
       const {
         pair, bid, baseRate, method,
       } = _.minBy(compactListShouldBuy, 'percentage');
