@@ -34,7 +34,7 @@ const {
 const messenger = require('./messenger');
 const { general: { telegramToken } } = require('./setting.json');
 
-const weightStep = 0.0052083;
+const weightStep = 0.25 / 48;
 let delay = 0;
 let weight = 1;
 let lastScannedSymbol;
@@ -56,7 +56,9 @@ const autoUpdater = require('./autoUpdater');
 let telegram = new TelegramBot(telegramToken);
 
 setInterval(() => {
-  weight -= weightStep;
+  if (weight > 0.75) {
+    weight -= weightStep;
+  }
 }, 1800000);
 
 async function start(data) {
@@ -384,7 +386,6 @@ async function start(data) {
     }
 
     if (compactListShouldBuy.length > 0) {
-      weight = 1;
       const {
         pair, bid, baseRate, method,
       } = _.minBy(compactListShouldBuy, 'percentage');
@@ -411,6 +412,7 @@ async function start(data) {
         const buyFilled = await checkBuy(exchange, timeOrder, buyRef.id, pair, telegram, telegramUserId, io);
 
         if (buyFilled > 0) {
+          weight = 1;
           const amount2Sell = await calculateAmount2Sell(exchange, pair, buyFilled);
           const rate2Sell = rate2Buy * takeProfit;
           const checkAmount = isAmountOk(pair, amount2Sell, rate2Sell, telegram, telegramUserId, io);
