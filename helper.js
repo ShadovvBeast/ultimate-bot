@@ -273,16 +273,17 @@ function upTrend(opens, highs, lows, closes) {
   const pastBaseCondition = secondLastRSI <= 20 || (secondLastRSI >= 50 && secondLastRSI <= 80);
   const currentBaseCondition = lastRSI <= 20 || (lastRSI >= 50 && lastRSI <= 80);
 
-  const buyIndicatorTest = [macdCheck, stochCheck, maCheck, bbCheck];
-  const buyIndicatorAccumulator = buyIndicatorTest.reduce((accumulate, current) => {
-    if (current) {
-      return accumulate + 1;
-    }
-    return accumulate;
-  }, 0);
-
-  const shouldBuy = currentBaseCondition && pastBaseCondition && lastOpen <= lastBB.upper && lastPSAR <= lastClose && buyIndicatorAccumulator >= 2;
-  return shouldBuy;
+  const upTrendBuyWeight = [
+    [+(currentBaseCondition), 10],
+    [+(pastBaseCondition), 4],
+    [+(lastOpen <= lastBB.upper), 6],
+    [+(lastPSAR <= lastClose), 6],
+    [+(macdCheck), 6],
+    [+(stochCheck), 6],
+    [+(maCheck), 6],
+    [+(bbCheck), 6],
+  ]; // 50 % weight
+  return upTrendBuyWeight;
 }
 
 async function calculateAmount2Sell(exchange, pair, orgAmount) {
