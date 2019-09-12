@@ -34,9 +34,7 @@ const {
 const messenger = require('./messenger');
 const { general: { telegramToken } } = require('./setting.json');
 
-const weightStep = 0.25 / 48;
 let delay = 0;
-let weight = 1;
 let lastScannedSymbol;
 let shouldSkipAllSymbols = false;
 let shouldEnableCounterDDOS = false;
@@ -55,11 +53,14 @@ const autoUpdater = require('./autoUpdater');
 
 let telegram = new TelegramBot(telegramToken);
 
+let weight = 1;
+const weightStep = 0.25 / 48;
 setInterval(() => {
   if (weight > 0.85) {
     weight -= weightStep;
   }
 }, 1800000);
+let initWeightTime = moment();
 
 async function start(data) {
   try {
@@ -227,7 +228,7 @@ async function start(data) {
 
     const candleDifferentMarkets = await Promise.all(slicedScanDifferentMarkets.map(({ symbol }, index) => limiter.schedule(() => new Promise(async (resolve) => {
       try {
-        // We we got banned, skip all remain pairs
+        // We got banned, skip all remain pairs
         if (!shouldSkipAllSymbols) {
           // If we reach to the end of array then reset lastScannedSymbol
 
@@ -373,6 +374,9 @@ async function start(data) {
     }
 
     if (compactListShouldBuy.length > 0) {
+      const currentWeightTime = moment();
+      const weightDiffTime = moment.duration(currentWeightTime.diff(initWeightTime)).asDays();
+      const diffTimeCheck = weightDiffTime >= 1;
       const {
         pair, bid, baseRate, method,
       } = _.minBy(compactListShouldBuy, 'percentage');
@@ -382,8 +386,8 @@ async function start(data) {
       if (isLastSell) {
         const { precision: { amount, price } } = _.find(markets, o => o.symbol === pair);
         let rate2Buy;
-
         rate2Buy = method === 'Dip' ? baseRate * 0.985 : bid * 0.99;
+        rate2Buy = diffTimeCheck ? rate2Buy * 1.01 : rate2Buy;
         if (rate2Buy > bid) {
           rate2Buy = bid;
         }
@@ -400,6 +404,7 @@ async function start(data) {
 
         if (buyFilled > 0) {
           weight = 1;
+          initWeightTime = moment();
           const amount2Sell = await calculateAmount2Sell(exchange, pair, buyFilled);
           const rate2Sell = rate2Buy * takeProfit;
           const checkAmount = isAmountOk(pair, amount2Sell, rate2Sell, telegram, telegramUserId, io);
