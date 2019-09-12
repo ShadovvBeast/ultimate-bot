@@ -1,13 +1,9 @@
 {
   "name": "ultimate-bot",
-  "version": "4.4.2",
+  "version": "4.4.3",
   "main": "app.js",
   "license": "MIT",
   "description": "Ultimate bot",
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/dotai2012/ultimate-bot.git"
-  },
   "dependencies": {
     "adm-zip": "^0.4.13",
     "auto-reload-json": "^1.0.2",
