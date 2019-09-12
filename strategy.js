@@ -56,7 +56,7 @@ const autoUpdater = require('./autoUpdater');
 let telegram = new TelegramBot(telegramToken);
 
 setInterval(() => {
-  if (weight > 0.75) {
+  if (weight > 0.85) {
     weight -= weightStep;
   }
 }, 1800000);
@@ -199,7 +199,7 @@ async function start(data) {
           const boughtIndex = openOrders.findIndex(o => o.symbol === symbol);
           if (boughtIndex === -1) {
             const candles = await fetchCandle(ultimateExchange, symbol, timeFrame);
-            const ticker = await ultimateExchange.fetchTicker(symbol);
+            const ticker = await exchange.fetchTicker(symbol);
 
             console.log(loggingMessage(`Scanning: ${symbol}`));
 
