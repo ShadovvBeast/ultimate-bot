@@ -56,7 +56,7 @@ let telegram = new TelegramBot(telegramToken);
 let weight = 1;
 const weightStep = 0.25 / 48;
 setInterval(() => {
-  if (weight > 0.85) {
+  if (weight > 0.9) {
     weight -= weightStep;
   }
 }, 1800000);
