@@ -54,7 +54,7 @@ const autoUpdater = require('./autoUpdater');
 let telegram = new TelegramBot(telegramToken);
 
 let weight = 1;
-const weightStep = 0.25 / 48;
+const weightStep = 0.1 / 48;
 setInterval(() => {
   if (weight > 0.9) {
     weight -= weightStep;
@@ -308,14 +308,14 @@ async function start(data) {
         const volChecker = volDiff >= 0.75 || lastVolOsc > 0;
 
         const meanBaseCondition = [
-          [+(last >= 0.000001), 6.25],
-          [+(last <= lastEMA), 6.25],
+          [+(last >= 0.000001), 8.25],
+          [+(last <= lastEMA), 8.25],
           [+(spikyVal <= 3.5), 6.25],
           [+(changeBB >= 1.08), 6.25],
-          [+(quoteVolume >= 1), 6.25],
-          [+(orderThickness >= 0.95), 6.25],
-          [+(volChecker), 6.25],
-          [+(closeDiff <= 1.025), 6.25],
+          [+(quoteVolume >= 1), 4.25],
+          [+(orderThickness >= 0.95), 4.25],
+          [+(volChecker), 4.25],
+          [+(closeDiff <= 1.025), 8.25],
         ]; // 50 % weight
 
         const dipWeight = weightedMean([
@@ -395,8 +395,10 @@ async function start(data) {
       } = _.minBy(compactListShouldBuy, 'percentage');
       const historyOrder = await exchange.fetchMyTrades(pair);
       const isLastSell = historyOrder.length === 0 ? true : _.last(historyOrder).side === 'sell';
+      const currentTime = moment();
+      const isTradeLongEnough = isLastSell ? true : moment.duration(currentTime.diff(moment(_.last(historyOrder).datetime))).asDays() >= 3;
 
-      if (isLastSell) {
+      if (isLastSell || isTradeLongEnough) {
         const { precision: { amount, price } } = _.find(markets, o => o.symbol === pair);
         let rate2Buy;
         rate2Buy = method === 'Dip' ? baseRate * 0.985 : bid * 0.99;
