@@ -348,17 +348,17 @@ async function start(data) {
           resolve({
             pair, percentage, bid, baseRate, method: 'Dip',
           });
-        } else if (smoothedHeikinWeight >= weight) {
+        } else if (smoothedHeikinWeight >= 1) {
           console.log(strategyResult, 'SUCCESS');
           resolve({
             pair, percentage, bid, baseRate, method: 'Smoothed Heikin',
           });
-        } else if (slowHeikinWeight >= weight) {
+        } else if (slowHeikinWeight >= 1) {
           console.log(strategyResult, 'SUCCESS');
           resolve({
             pair, percentage, bid, baseRate, method: 'Slow Heikin',
           });
-        } else if (topWeight >= weight) {
+        } else if (topWeight >= 1) {
           console.log(strategyResult, 'SUCCESS');
           resolve({
             pair, percentage, bid, baseRate, method: 'Top',
@@ -413,7 +413,7 @@ async function start(data) {
         const buyRef = await exchange.createLimitBuyOrder(pair, amount2Buy.toFixedNumber(amount).noExponents(), rate2Buy.toFixedNumber(price).noExponents());
 
         await writeDangling(dangling, bought, pair, buyRef.id);
-        messageTrade(buyRef, `Buy (${method})`, amount2Buy, pair, rate2Buy, telegram, telegramUserId, io, 'trigger:buy');
+        messageTrade(buyRef, `Buy ${method}`, amount2Buy, pair, rate2Buy, telegram, telegramUserId, io, 'trigger:buy');
 
         const buyFilled = await checkBuy(exchange, timeOrder, buyRef.id, pair, telegram, telegramUserId, io);
 
