@@ -400,7 +400,7 @@ async function start(data) {
         const buyRef = await exchange.createLimitBuyOrder(pair, amount2Buy.toFixedNumber(amount).noExponents(), rate2Buy.toFixedNumber(price).noExponents());
 
         await writeDangling(dangling, bought, pair, buyRef.id);
-        messageTrade(buyRef, `Buy ${method}`, amount2Buy, pair, rate2Buy, telegram, telegramUserId, io, 'trigger:buy');
+        messageTrade(buyRef, `Buy (${method} strategy)`, amount2Buy, pair, rate2Buy, telegram, telegramUserId, io, 'trigger:buy');
 
         const buyFilled = await checkBuy(exchange, timeOrder, buyRef.id, pair, telegram, telegramUserId, io);
 
