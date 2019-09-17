@@ -130,7 +130,7 @@ if (cluster.isMaster) {
 
   io.on('connection', async (socket) => {
     // Init
-    let author = '';
+    let author = 'https://www.fiverr.com/onfqzmpgvr/provide-my-cryptocurrency-trading-bot';
     socket.on('author', (currentAuthor) => {
       author = currentAuthor;
     });
